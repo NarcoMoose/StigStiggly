@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; Overview{% endblock %}
+{% block content %}
+<h1 class="page-title">Baselines</h1>
+{% if not baselines %}
+  <div class="empty-state">
+    <p>No mSCP audit results found in <code>{{ cfg.prefs_dir }}</code>.</p>
+    <p class="muted">Run a compliance scan first, e.g.
+      <code>sudo &lt;repo&gt;/build/&lt;BASELINE&gt;/&lt;BASELINE&gt;_compliance.sh --check</code>,
+      then reload this page.</p>
+  </div>
+{% endif %}
+<div class="card-grid">
+  {% for b in baselines %}
+  {% set age = scan_age_days(b) %}
+  <div class="card baseline-card">
+    <a class="card-overlay" href="{{ url_for('baseline_view', name=b.name) }}" aria-label="Open {{ b.name }}"></a>
+    <div class="card-chart">
+      <svg viewBox="0 0 42 42" class="donut" role="img" aria-label="Compliance donut chart">
+        <circle class="donut-ring" cx="21" cy="21" r="15.91549"></circle>
+        {% for seg in donut_segments(b) %}
+        <circle class="donut-seg seg-{{ seg.status }}" cx="21" cy="21" r="15.91549"
+                stroke-dasharray="{{ '%.3f' % seg.pct }} {{ '%.3f' % (100 - seg.pct) }}"
+                stroke-dashoffset="{{ '%.3f' % seg.offset }}"></circle>
+        {% endfor %}
+        <text x="21" y="20.2" class="donut-num">{{ b.compliance_pct if b.compliance_pct is not none else '–' }}%</text>
+        <text x="21" y="26" class="donut-label">compliant</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <div class="card-title">{{ b.name }}</div>
+      <div class="card-sub muted" title="{{ b.title }}">{{ b.title }}</div>
+      <ul class="legend">
+        <li><span class="dot dot-pass"></span>{{ b.counts['pass'] }} passed</li>
+        <li><span class="dot dot-fail"></span>{{ b.counts['fail'] }} failed</li>
+        {% if b.counts['exempt'] %}<li><span class="dot dot-exempt"></span>{{ b.counts['exempt'] }} exempt</li>{% endif %}
+        {% if b.counts['not_scanned'] %}<li><span class="dot dot-not_scanned"></span>{{ b.counts['not_scanned'] }} not scanned</li>{% endif %}
+      </ul>
+      <div class="card-foot muted">
+        {% if b.last_check %}
+          Last scan: {{ b.last_check.strftime('%Y-%m-%d %H:%M') }}
+          {% if age is not none and age > stale_after %}<span class="stale">({{ age }} days ago)</span>{% endif %}
+        {% else %}
+          No scan recorded
+        {% endif %}
+      </div>
+      <div class="card-actions">
+        {% if can_act %}
+          {% set script = find_script(b.name) %}
+          <button class="btn scan-btn" data-baseline="{{ b.name }}"
+                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ cfg.effective_build_dir / b.name }}"{% endif %}>
+            Run scan</button>
+        {% else %}
+          <button class="btn" disabled data-locked="1" title="Start with `sudo stigstiggly serve` to run scans">Run scan</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% include "activity.html" %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='activity.js') }}"></script>{% endblock %}

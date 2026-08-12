@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; Not found{% endblock %}
+{% block content %}
+<div class="empty-state">
+  <h1 class="page-title">Not found</h1>
+  <p class="muted">{{ error.description }}</p>
+  <p><a href="{{ url_for('overview') }}">Back to overview</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; {{ baseline.name }}{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{{ url_for('overview') }}">Baselines</a> / <span>{{ baseline.name }}</span></nav>
+<div class="baseline-head">
+  <div class="baseline-summary card">
+    <svg viewBox="0 0 42 42" class="donut donut-sm" role="img" aria-label="Compliance donut chart">
+      <circle class="donut-ring" cx="21" cy="21" r="15.91549"></circle>
+      {% for seg in donut_segments(baseline) %}
+      <circle class="donut-seg seg-{{ seg.status }}" cx="21" cy="21" r="15.91549"
+              stroke-dasharray="{{ '%.3f' % seg.pct }} {{ '%.3f' % (100 - seg.pct) }}"
+              stroke-dashoffset="{{ '%.3f' % seg.offset }}"></circle>
+      {% endfor %}
+      <text x="21" y="20.2" class="donut-num">{{ baseline.compliance_pct if baseline.compliance_pct is not none else '–' }}%</text>
+      <text x="21" y="26" class="donut-label">compliant</text>
+    </svg>
+    <div>
+      <h1 class="page-title">{{ baseline.name }}</h1>
+      <p class="muted baseline-title">{{ baseline.title }}</p>
+      <div class="stat-chips">
+        <span class="chip chip-pass">{{ baseline.counts['pass'] }} passed</span>
+        <span class="chip chip-fail">{{ baseline.counts['fail'] }} failed</span>
+        <span class="chip chip-exempt">{{ baseline.counts['exempt'] }} exempt</span>
+        <span class="chip chip-not_scanned">{{ baseline.counts['not_scanned'] }} not scanned</span>
+      </div>
+      <p class="muted small">
+        {% if baseline.last_check %}Last scan: {{ baseline.last_check.strftime('%Y-%m-%d %H:%M %Z') or baseline.last_check }}{% else %}No scan recorded{% endif %}
+        &middot; source: <code>{{ baseline.plist_path }}</code>
+        {% if not baseline.yaml_found %}<br><span class="stale">No baseline YAML found in repo &mdash; showing flat results without sections.</span>{% endif %}
+      </p>
+      <div class="card-actions">
+        {% set fail_count = baseline.counts['fail'] %}
+        {% if can_act %}
+          {% set script = find_script(baseline.name) %}
+          <button class="btn scan-btn" data-baseline="{{ baseline.name }}"
+                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ cfg.effective_build_dir / baseline.name }}"{% endif %}>
+            Run scan</button>
+          <button class="btn btn-danger" id="fix-open"
+                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ cfg.effective_build_dir / baseline.name }}"
+                  {% elif not fail_count %}disabled data-locked="1" title="No failed (non-exempt) rules to remediate"{% endif %}>
+            Remediate {{ fail_count }} failed</button>
+        {% else %}
+          <button class="btn" disabled data-locked="1" title="Start with `sudo stigstiggly serve` to run scans">Run scan</button>
+          <button class="btn" disabled data-locked="1" title="Start with `sudo stigstiggly serve` to remediate">Remediate</button>
+        {% endif %}
+        <a class="btn" href="{{ url_for('export_csv', name=baseline.name) }}">Export CSV</a>
+      </div>
+    </div>
+  </div>
+  {% if baseline.severity_fail %}
+  <div class="card severity-card">
+    <h2 class="card-heading">Failures by severity</h2>
+    {% set maxfail = baseline.severity_fail.values() | max %}
+    {% for sev, count in baseline.severity_fail.items() %}
+    <div class="sev-row">
+      <span class="sev-label sev-{{ sev }}">{{ sev }}</span>
+      <div class="sev-track"><div class="sev-bar sev-bg-{{ sev }}" style="width: {{ (count * 100 / maxfail) | round(1) }}%"></div></div>
+      <span class="sev-count">{{ count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{% if trend %}
+<div class="card history-card">
+  <h2 class="card-heading">Compliance trend
+    <span class="muted small">({{ trend.count }} scans &middot;
+      {% if trend.delta >= 0 %}+{% endif %}{{ trend.delta }}% since {{ trend.first }})</span>
+  </h2>
+  <svg viewBox="0 0 {{ trend.w }} {{ trend.h }}" class="trend" role="img" aria-label="Compliance percentage over time">
+    {% for g in trend.gridlines %}
+    <line class="trend-grid" x1="{{ trend.pad_l }}" y1="{{ g.y }}" x2="{{ trend.right }}" y2="{{ g.y }}"></line>
+    <text class="trend-ylabel" x="{{ trend.pad_l - 6 }}" y="{{ g.y + 3 }}">{{ g.pct }}%</text>
+    {% endfor %}
+    <polyline class="trend-line" points="{{ trend.points }}"></polyline>
+    {% for d in trend.dots %}
+    <circle class="trend-dot" cx="{{ d.x }}" cy="{{ d.y }}" r="3.5"><title>{{ d.title }}</title></circle>
+    {% endfor %}
+  </svg>
+  <div class="trend-x muted small"><span>{{ trend.first }}</span><span>{{ trend.last }}</span></div>
+</div>
+{% endif %}
+
+{% include "activity.html" %}
+
+{% if can_act %}
+{% set age = scan_age_days(baseline) %}
+<dialog class="modal" id="fix-modal" data-baseline="{{ baseline.name }}">
+  <h2>Remediate {{ baseline.name }}</h2>
+  <p>This runs mSCP's own remediation commands <strong>as root</strong> for every rule
+    listed below (failed and not exempt). Some fixes change system behavior immediately
+    &mdash; disabling services, tightening policies &mdash; and a few may require a
+    logout or restart to fully apply.</p>
+  <p class="small"><code>{{ find_script(baseline.name) }} --fix</code></p>
+  {% if age is not none and age > stale_after %}
+  <p class="stale small">Findings are from a scan {{ age }} days ago &mdash; consider
+    running a fresh scan first so remediation targets current state.</p>
+  {% endif %}
+  <p class="small muted">Exempt rules are skipped. A fresh compliance scan will run
+    automatically after remediation completes.</p>
+  <div class="modal-rules">
+    <table>
+      {% for r in baseline.rules if r.status == 'fail' %}
+      <tr>
+        <td class="mono small">{{ r.id }}</td>
+        <td class="small">{{ r.title }}</td>
+        <td><span class="sev-label sev-{{ r.severity }}">{{ r.severity }}</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="modal-actions">
+    <button class="btn" id="fix-cancel">Cancel</button>
+    <button class="btn btn-danger" id="fix-confirm">Remediate {{ baseline.counts['fail'] }} rules</button>
+  </div>
+</dialog>
+{% endif %}
+
+<div class="filter-bar">
+  <input type="search" id="rule-search" placeholder="Search rules, titles, STIG IDs&hellip;" autocomplete="off">
+  <div class="filter-group" id="status-filters" data-filter="status">
+    <button class="fbtn active" data-value="">All</button>
+    <button class="fbtn fbtn-pass" data-value="pass">Pass</button>
+    <button class="fbtn fbtn-fail" data-value="fail">Fail</button>
+    <button class="fbtn fbtn-exempt" data-value="exempt">Exempt</button>
+    <button class="fbtn fbtn-not_scanned" data-value="not_scanned">Not scanned</button>
+  </div>
+  <div class="filter-group" id="severity-filters" data-filter="severity">
+    <button class="fbtn active" data-value="">Any severity</button>
+    <button class="fbtn" data-value="high">High</button>
+    <button class="fbtn" data-value="medium">Medium</button>
+    <button class="fbtn" data-value="low">Low</button>
+  </div>
+  <span class="muted small" id="visible-count"></span>
+</div>
+
+<table class="rule-table" id="rule-table">
+  <thead>
+    <tr><th class="col-status">Status</th><th>Rule</th><th>Title</th><th class="col-sev">Severity</th><th class="col-stig">STIG ID</th></tr>
+  </thead>
+  <tbody>
+    {% for section in baseline.sections %}
+    <tr class="section-row" data-section="{{ section.key }}">
+      <td colspan="5">{{ section.name }} <span class="muted small">({{ section.rules | length }})</span></td>
+    </tr>
+    {% for r in section.rules %}
+    <tr class="rule-row" data-status="{{ r.status }}" data-severity="{{ r.severity }}" data-section="{{ section.key }}"
+        data-text="{{ (r.id ~ ' ' ~ r.title ~ ' ' ~ (r.stig_ids | join(' '))) | lower }}">
+      <td class="col-status"><span class="badge badge-{{ r.status }}">{{ r.status | replace('_', ' ') }}</span></td>
+      <td class="mono"><a href="{{ url_for('rule_view', name=baseline.name, rule_id=r.id) }}">{{ r.id }}</a></td>
+      <td>{{ r.title }}</td>
+      <td class="col-sev"><span class="sev-label sev-{{ r.severity }}">{{ r.severity }}</span></td>
+      <td class="col-stig mono">{{ r.stig_ids | join(', ') }}</td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='activity.js') }}"></script>
+{% endblock %}

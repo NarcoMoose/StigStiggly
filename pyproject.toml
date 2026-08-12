@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stigstiggly"
+version = "0.1.0"
+description = "Local web dashboard for visualizing mSCP (macOS Security Compliance Project) scan results"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.0,<4",
+    "pyyaml>=6.0,<7",
+]
+
+[project.scripts]
+stigstiggly = "stigstiggly.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["stigstiggly*"]
+
+[tool.setuptools.package-data]
+stigstiggly = ["templates/*.html", "static/*"]

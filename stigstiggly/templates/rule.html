@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; {{ rule.id }}{% endblock %}
+{% block content %}
+<nav class="crumbs">
+  <a href="{{ url_for('overview') }}">Baselines</a> /
+  <a href="{{ url_for('baseline_view', name=baseline.name) }}">{{ baseline.name }}</a> /
+  <span>{{ rule.id }}</span>
+</nav>
+
+<div class="rule-head">
+  <h1 class="page-title mono">{{ rule.id }}</h1>
+  <div class="rule-badges">
+    <span class="badge badge-{{ rule.status }}">{{ rule.status | replace('_', ' ') }}</span>
+    <span class="sev-label sev-{{ rule.severity }}">severity: {{ rule.severity }}</span>
+    {% for sid in rule.stig_ids %}<span class="pill pill-stig mono">{{ sid }}</span>{% endfor %}
+    {% if rule.meta and rule.meta.mobileconfig %}<span class="pill" title="Enforced via configuration profile">mobileconfig</span>{% endif %}
+  </div>
+  <h2 class="rule-title">{{ rule.title }}</h2>
+  {% if rule.exempt %}
+  <p class="banner banner-warn inline-banner">Exempt{% if rule.exempt_reason %}: {{ rule.exempt_reason }}{% endif %}</p>
+  {% endif %}
+</div>
+
+{% if not rule.meta %}
+<div class="card"><p class="stale">No metadata found for this rule in {{ repo_info.path }}/rules &mdash; the repo may be on a
+different branch than the one used to build the compliance script.</p></div>
+{% else %}
+
+{% if rule.meta.discussion %}
+<section class="card">
+  <h2 class="card-heading">Discussion</h2>
+  <p class="prose">{{ rule.meta.discussion }}</p>
+</section>
+{% endif %}
+
+{% if rule.check %}
+<section class="card">
+  <h2 class="card-heading">Check</h2>
+  <pre class="code"><code>{{ rule.check }}</code></pre>
+  {% if rule.result_expected %}<p class="muted small">Expected result &mdash; <code>{{ rule.result_expected }}</code></p>{% endif %}
+</section>
+{% endif %}
+
+{% if fix_parts %}
+<section class="card">
+  <h2 class="card-heading">Fix</h2>
+  {% for kind, chunk in fix_parts %}
+    {% if kind == 'code' %}<pre class="code"><code>{{ chunk }}</code></pre>
+    {% else %}<p class="prose muted">{{ chunk }}</p>{% endif %}
+  {% endfor %}
+  <p class="muted small">Fix commands are shown for reference; this dashboard is read-only in Phase 1.</p>
+</section>
+{% elif rule.meta.mobileconfig %}
+<section class="card">
+  <h2 class="card-heading">Fix</h2>
+  <p class="prose muted">This rule is enforced via a configuration profile (mobileconfig) rather than a shell command.</p>
+</section>
+{% endif %}
+
+{% if rule.meta.references %}
+<section class="card">
+  <h2 class="card-heading">References</h2>
+  <table class="ref-table">
+    {% for key, values in rule.meta.references.items() %}
+    <tr><th>{{ ref_label(key) }}</th><td class="mono">{{ values | join(', ') }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+
+{% if rule.meta.tags %}
+<section class="card">
+  <h2 class="card-heading">Tags</h2>
+  <div class="tag-list">{% for t in rule.meta.tags %}<span class="pill">{{ t }}</span>{% endfor %}</div>
+</section>
+{% endif %}
+
+<p class="muted small">Source: <code>{{ rule.meta.source }}</code></p>
+{% endif %}
+
+{% if rule.finding is not none %}
+<section class="card" id="exempt-card" data-baseline="{{ baseline.name }}" data-rule="{{ rule.id }}">
+  <h2 class="card-heading">Exemption</h2>
+  {% if can_act %}
+    {% if rule.exempt %}
+      <p class="prose">This rule is exempt{% if rule.exempt_reason %} &mdash; <em>{{ rule.exempt_reason }}</em>{% endif %}.
+        Exempt rules count toward compliance and are skipped by remediation.</p>
+      <div class="exempt-form">
+        <button class="btn" id="exempt-clear">Remove exemption</button>
+      </div>
+    {% else %}
+      <p class="prose muted">Exempting a rule records an organizational deviation: it counts
+        toward compliance and remediation skips it. Requires a reason.</p>
+      <div class="exempt-form">
+        <input type="text" id="exempt-reason" placeholder="Reason (e.g. approved deviation, ticket #)" maxlength="300">
+        <button class="btn" id="exempt-set">Mark exempt</button>
+      </div>
+    {% endif %}
+  {% else %}
+    {% if rule.exempt %}
+      <p class="prose">Exempt{% if rule.exempt_reason %} &mdash; <em>{{ rule.exempt_reason }}</em>{% endif %}.</p>
+    {% else %}
+      <p class="prose muted">Not exempt. Start the server with <code>sudo stigstiggly serve</code> to manage exemptions.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='activity.js') }}"></script>{% endblock %}

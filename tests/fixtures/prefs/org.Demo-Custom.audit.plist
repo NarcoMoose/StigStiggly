@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>audit_auditd_enabled</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>audit_control_group_configure</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>icloud_addressbook_disable</key>
+	<dict>
+		<key>exempt</key>
+		<true/>
+		<key>exempt_reason</key>
+		<string>Approved deviation - ticket SEC-1234</string>
+		<key>finding</key>
+		<true/>
+	</dict>
+	<key>icloud_keychain_disable</key>
+	<dict>
+		<key>finding</key>
+		<true/>
+	</dict>
+	<key>icloud_mail_disable</key>
+	<dict>
+		<key>finding</key>
+		<true/>
+	</dict>
+	<key>lastComplianceCheck</key>
+	<string>2026-06-29 10:01:03-0400</string>
+	<key>os_dictation_disable</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>os_newsyslog_files_owner_group_configure</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>os_sip_enable</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>os_sudoers_timestamp_type_configure</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>os_user_app_installation_prohibit</key>
+	<dict>
+		<key>exempt</key>
+		<true/>
+		<key>exempt_reason</key>
+		<string>Approved deviation - ticket SEC-1234</string>
+		<key>finding</key>
+		<true/>
+	</dict>
+	<key>system_settings_bluetooth_sharing_disable</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+	<key>system_settings_remote_management_disable</key>
+	<dict>
+		<key>finding</key>
+		<false/>
+	</dict>
+</dict>
+</plist>

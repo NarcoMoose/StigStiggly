@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}StigStiggly{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="{{ url_for('overview') }}" class="brand-name">StigStiggly</a>
+      <span class="brand-sub">mSCP Compliance Dashboard</span>
+    </div>
+    <div class="topbar-meta">
+      {% if can_act %}
+        <span class="pill pill-ok" title="Server is privileged: scans can be run from this dashboard">actions enabled</span>
+      {% else %}
+        <span class="pill pill-mode" title="Start with `sudo stigstiggly serve` to run scans from the dashboard">read-only</span>
+      {% endif %}
+      {% if repo_info.version_label %}
+        <span class="meta-item" title="{{ repo_info.path }}">{{ repo_info.version_label }}</span>
+      {% endif %}
+      {% if repo_info.matches_host %}
+        <span class="pill pill-ok" title="Guidance targets macOS {{ repo_info.os_version }}; host is {{ repo_info.host_os }}">macOS {{ repo_info.host_os }} ✓</span>
+      {% endif %}
+    </div>
+  </header>
+  {% if repo_info.matches_host == false %}
+  <div class="banner banner-warn">
+    Guidance version mismatch: the repo at {{ repo_info.path }} targets macOS
+    {{ repo_info.os_version }}, but this host runs macOS {{ repo_info.host_os }}.
+    Rule metadata may not match what was scanned &mdash; check out the matching
+    branch of macos_security.
+  </div>
+  {% endif %}
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    StigStiggly v{{ app_version }} &middot; results from {{ cfg.prefs_dir }} &middot; guidance from {{ repo_info.path }}
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
