@@ -70,10 +70,19 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
 - Security posture: binds 127.0.0.1 only, Host-header allowlist (DNS-rebinding
   defense), per-run CSRF token required on every POST, `--debug` refused as root.
 - Compliance % formula mirrors the mSCP compliance script: (pass + exempt) / scanned.
-- `history.py` — append-only JSONL snapshot per baseline (counts + failed/exempt
-  rule ids), recorded opportunistically on page load whenever `lastComplianceCheck`
-  is new, so history accrues even for scans run outside the dashboard. Under sudo,
-  files are chown'd to `SUDO_USER` so unprivileged sessions can keep appending.
-  The baseline page renders a trend line (server-side SVG) once 2+ scans exist.
+- `history.py` — append-only JSONL snapshot per baseline (counts, per-status rule
+  id lists, host OS version), recorded opportunistically on page load whenever
+  `lastComplianceCheck` is new, so history accrues even for scans run outside the
+  dashboard. Under sudo, files are chown'd to `SUDO_USER` so unprivileged sessions
+  can keep appending. The baseline page renders a trend line (server-side SVG)
+  once 2+ scans exist. `diff_snapshots(older, newer)` computes scan-to-scan
+  transitions (newly failing/passing/exempt, baseline membership changes, OS
+  version change); tolerates pre-enrichment entries that lack pass/not_scanned
+  ids via its `complete` flag.
+- Scan comparison UI: "Changes since" card on the baseline page (below the trend
+  line) — latest scan vs. a picked older snapshot (`?compare=<ts>`, default:
+  previous). Renders transition chip groups linking to rule pages, a pct-delta
+  badge, and an OS-version-change banner when the host OS differs between the
+  two snapshots.
 - CSV export: `GET /baseline/<name>/export.csv` — one row per rule with section,
   status, severity, STIG IDs, and exemption info.

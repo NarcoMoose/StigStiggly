@@ -82,6 +82,52 @@
 </div>
 {% endif %}
 
+{% if comparison %}
+<div class="card compare-card">
+  <div class="compare-head">
+    <h2 class="card-heading">Changes since</h2>
+    <form method="get" class="compare-form">
+      <select name="compare" onchange="this.form.submit()">
+        {% for opt in comparison.options %}
+        <option value="{{ opt.ts }}" {% if opt.ts == comparison.selected_ts %}selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <span class="muted small">compared to latest scan ({{ comparison.latest_label }})</span>
+    {% set delta = comparison.diff.pct_delta %}
+    <span class="badge {{ 'badge-pass' if delta >= 0 else 'badge-fail' }}">{{ '+' if delta >= 0 }}{{ delta }}%</span>
+  </div>
+  {% if comparison.diff.os_change %}
+  <p class="small compare-os">macOS version changed between these scans
+    ({{ comparison.diff.os_change[0] or 'unrecorded' }} &rarr; {{ comparison.diff.os_change[1] or 'unrecorded' }})
+    &mdash; settings drift after OS updates is expected.</p>
+  {% endif %}
+  {% if comparison.changed %}
+    {% for group in comparison.groups %}
+    <div class="diff-group">
+      <h3 class="diff-label diff-{{ group.css }}">{{ group.label }} ({{ group.ids | length }})</h3>
+      <div class="tag-list">
+        {% for rid in group.ids %}
+          {% if rid in rule_titles %}
+          <a class="pill pill-diff pill-{{ group.css }}" href="{{ url_for('rule_view', name=baseline.name, rule_id=rid) }}"
+             title="{{ rule_titles[rid] }}">{{ rid }}</a>
+          {% else %}
+          <span class="pill pill-diff" title="Not in the current baseline">{{ rid }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="muted">No rule-level changes between these scans.</p>
+  {% endif %}
+  {% if not comparison.diff.complete %}
+  <p class="muted small">The older snapshot predates full state capture, so rules added to or
+    removed from the baseline can't be detected for this pair.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {% include "activity.html" %}
 
 {% if can_act %}

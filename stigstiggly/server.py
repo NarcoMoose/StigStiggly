@@ -13,7 +13,7 @@ from flask import Flask, Response, abort, jsonify, render_template, request
 
 from . import __version__
 from .actions import JobInProgress, JobManager, find_compliance_script, set_exemption
-from .history import load_history, record_snapshot
+from .history import diff_snapshots, load_history, record_snapshot
 from .config import AppConfig
 from .mscp_data import (
     REFERENCE_LABELS,
@@ -73,6 +73,41 @@ def trend_chart(history: list[dict], width: int = 640, height: int = 150) -> dic
         "last": pts[-1]["ts"][:10],
         "count": len(pts),
         "delta": round(pts[-1]["pct"] - pts[0]["pct"], 1),
+    }
+
+
+DIFF_BUCKETS = (
+    ("newly_failing", "Newly failing", "fail"),
+    ("newly_passing", "Newly passing", "pass"),
+    ("newly_exempt", "Newly exempt", "exempt"),
+    ("unexempted", "Exemption removed", "unexempt"),
+    ("added_rules", "Added to baseline", "added"),
+    ("removed_rules", "Removed from baseline", "removed"),
+)
+
+
+def build_comparison(history: list[dict], requested_ts: str | None) -> dict | None:
+    """Diff of the latest snapshot against a chosen older one, shaped for the
+    template: chip groups per transition plus the picker's option list."""
+    if len(history) < 2:
+        return None
+    latest, candidates = history[-1], history[:-1]
+    older = next((e for e in candidates if e["ts"] == requested_ts), candidates[-1])
+    diff = diff_snapshots(older, latest)
+    groups = [
+        {"key": key, "label": label, "css": css, "ids": diff.get(key) or []}
+        for key, label, css in DIFF_BUCKETS
+    ]
+    return {
+        "diff": diff,
+        "groups": [g for g in groups if g["ids"]],
+        "options": [
+            {"ts": e["ts"], "label": f"{e['ts'][:16].replace('T', ' ')} — {e['pct']}%"}
+            for e in reversed(candidates)
+        ],
+        "selected_ts": older["ts"],
+        "latest_label": latest["ts"][:16].replace("T", " "),
+        "changed": any(g["ids"] for g in groups),
     }
 
 
@@ -144,11 +179,14 @@ def create_app(cfg: AppConfig) -> Flask:
     def baseline_view(name: str):
         baseline = get_baseline(name)
         snapshot(baseline)
+        history = load_history(cfg.history_dir, baseline.name)
         return render_template(
             "baseline.html",
             baseline=baseline,
             donut_segments=donut_segments,
-            trend=trend_chart(load_history(cfg.history_dir, baseline.name)),
+            trend=trend_chart(history),
+            comparison=build_comparison(history, request.args.get("compare")),
+            rule_titles={r.id: r.title for r in baseline.rules},
         )
 
     @app.route("/baseline/<name>/export.csv")

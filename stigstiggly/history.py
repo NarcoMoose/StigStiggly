@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import pwd
 from pathlib import Path
 
@@ -60,16 +61,20 @@ def record_snapshot(history_dir: Path, baseline: Baseline) -> bool:
     if any(e["ts"] == ts for e in existing):
         return False
     counts = baseline.counts
+    by_status = lambda status: sorted(r.id for r in baseline.rules if r.status == status)
     entry = {
         "ts": ts,
+        "os_version": platform.mac_ver()[0],  # host OS when the snapshot was recorded
         "pass": counts["pass"],
         "fail": counts["fail"],
         "exempt": counts["exempt"],
         "not_scanned": counts["not_scanned"],
         "pct": baseline.compliance_pct,
         "sev_fail": baseline.severity_fail,
-        "failed_ids": sorted(r.id for r in baseline.rules if r.status == "fail"),
-        "exempt_ids": sorted(r.id for r in baseline.rules if r.status == "exempt"),
+        "failed_ids": by_status("fail"),
+        "exempt_ids": by_status("exempt"),
+        "pass_ids": by_status("pass"),
+        "not_scanned_ids": by_status("not_scanned"),
     }
     history_dir.mkdir(parents=True, exist_ok=True)
     _chown_to_invoker(history_dir)
@@ -78,3 +83,45 @@ def record_snapshot(history_dir: Path, baseline: Baseline) -> bool:
         fp.write(json.dumps(entry, separators=(",", ":")) + "\n")
     _chown_to_invoker(path)
     return True
+
+
+def diff_snapshots(older: dict, newer: dict) -> dict:
+    """Compare two snapshot entries (chronological order expected).
+
+    Buckets are mutually exclusive per rule. Entries written before the
+    pass_ids/not_scanned_ids fields existed are still comparable for
+    fail/exempt transitions; baseline membership changes (rules added or
+    removed, e.g. after switching guidance branches) are only computed when
+    both entries carry the full rule universe — indicated by ``complete``.
+    """
+    o_fail, n_fail = set(older.get("failed_ids") or ()), set(newer.get("failed_ids") or ())
+    o_exempt, n_exempt = set(older.get("exempt_ids") or ()), set(newer.get("exempt_ids") or ())
+
+    def universe(entry: dict) -> set | None:
+        if entry.get("pass_ids") is None or entry.get("not_scanned_ids") is None:
+            return None
+        return (
+            set(entry["pass_ids"]) | set(entry["not_scanned_ids"])
+            | set(entry.get("failed_ids") or ()) | set(entry.get("exempt_ids") or ())
+        )
+
+    o_all, n_all = universe(older), universe(newer)
+    complete = o_all is not None and n_all is not None
+    added = sorted(n_all - o_all) if complete else None
+    removed = sorted(o_all - n_all) if complete else None
+
+    return {
+        "older_ts": older.get("ts"),
+        "newer_ts": newer.get("ts"),
+        "os_change": (older.get("os_version"), newer.get("os_version"))
+        if older.get("os_version") != newer.get("os_version")
+        else None,
+        "pct_delta": round((newer.get("pct") or 0) - (older.get("pct") or 0), 1),
+        "newly_failing": sorted(n_fail - o_fail - o_exempt),
+        "newly_passing": sorted((o_fail - n_fail - n_exempt) - set(removed or ())),
+        "newly_exempt": sorted(n_exempt - o_exempt),
+        "unexempted": sorted(o_exempt - n_exempt),
+        "added_rules": added,
+        "removed_rules": removed,
+        "complete": complete,
+    }

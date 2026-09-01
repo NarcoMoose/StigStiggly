@@ -215,6 +215,32 @@ a.btn:hover { text-decoration: none; }
 .trend-dot:hover { fill: var(--green); }
 .trend-x { display: flex; justify-content: space-between; padding: 2px 4px 0; }
 
+/* scan comparison */
+.compare-card { margin-top: 18px; margin-bottom: 0; }
+.compare-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.compare-head .card-heading { margin: 0; }
+.compare-form select {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 5px 10px; font-size: 13px; outline: none;
+}
+.compare-form select:focus { border-color: var(--blue); }
+.compare-os { color: var(--amber); margin: 0 0 10px; }
+.diff-group { margin: 10px 0; }
+.diff-label { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; }
+.diff-fail { color: var(--red); }
+.diff-pass { color: var(--green); }
+.diff-exempt { color: var(--amber); }
+.diff-unexempt { color: var(--amber); }
+.diff-added { color: var(--blue); }
+.diff-removed { color: var(--gray); }
+.pill-diff { text-decoration: none; }
+.pill-diff:hover { text-decoration: none; border-color: var(--blue); }
+.pill-fail { color: var(--red); border-color: #47202a; }
+.pill-pass { color: var(--green); border-color: #1f4635; }
+.pill-exempt, .pill-unexempt { color: var(--amber); border-color: #57431c; }
+.pill-added { color: var(--blue); border-color: #1f3c5c; }
+.pill-removed { color: var(--gray); }
+
 /* rule detail */
 .rule-head { margin-bottom: 20px; }
 .rule-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; }
