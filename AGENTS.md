@@ -19,6 +19,7 @@ sudo .venv/bin/stigstiggly serve       # scan actions enabled
 .venv/bin/stigstiggly serve --debug    # auto-reload during development (refused as root)
 .venv/bin/stigstiggly setup            # first-run: download guidance content, write config
 .venv/bin/stigstiggly doctor           # diagnose environment (content, scripts, privileges)
+.venv/bin/stigstiggly report           # device compliance report as JSON (fleet collection)
 ```
 
 Settings precedence: CLI flag > `$STIGSTIGGLY_REPO` > `~/.config/stigstiggly/config.toml`
@@ -112,6 +113,12 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
   two snapshots.
 - CSV export: `GET /baseline/<name>/export.csv` — one row per rule with section,
   status, severity, STIG IDs, and exemption info.
+- Device report (`report.py`): versioned JSON (`stigstiggly.device-report/1`) with
+  host identity (hostname, OS, hardware serial), guidance version, and per-baseline
+  counts/pct/failed-ids/exemption-reasons. `stigstiggly report [-o file]` CLI and
+  `GET /report.json` (works in setup mode too — host info with empty baselines).
+  Read-only and unprivileged; intended for cron/MDM collection into a future
+  admin/aggregator view.
 - Baseline builder (`builder.py`, `/builder` routes): creates tailored baselines
   from a template using mSCP's own conventions — `custom/baselines/<name>.yaml`
   with `parent_values: custom`, plus `custom/rules/<id>.yaml` ODV overrides

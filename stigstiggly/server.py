@@ -34,6 +34,7 @@ from .builder import (
     list_templates,
 )
 from .history import diff_snapshots, load_history, record_snapshot
+from .report import build_report
 from .config import AppConfig, save_config_file
 from .mscp_data import (
     REFERENCE_LABELS,
@@ -460,6 +461,11 @@ def create_app(cfg: AppConfig) -> Flask:
             return jsonify(error=f"downloaded, but could not write config file: {exc}"), 500
         state["repo"], state["source"] = dest, "downloaded content"
         return jsonify(ok=True, path=str(dest))
+
+    @app.route("/report.json")
+    def device_report():
+        # Works even in setup mode: collectors still get host identity.
+        return jsonify(build_report(replace(cfg, repo=repo(), repo_source=state["source"])))
 
     @app.route("/job")
     def job_state():

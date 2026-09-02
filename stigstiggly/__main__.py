@@ -39,6 +39,9 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument("--yes", "-y", action="store_true", help="Skip the confirmation prompt")
 
     sub.add_parser("doctor", help="Diagnose the environment and report what is missing")
+
+    report = sub.add_parser("report", help="Print a device compliance report as JSON (for fleet collection)")
+    report.add_argument("--output", "-o", type=Path, default=None, help="Write to a file instead of stdout")
     return parser
 
 
@@ -128,6 +131,31 @@ def cmd_doctor(args) -> int:
     return worst
 
 
+def cmd_report(args) -> int:
+    import json
+
+    from .report import build_report
+
+    cfg = _build_config(args)
+    payload = json.dumps(build_report(cfg), indent=2)
+    if args.output:
+        args.output.write_text(payload + "\n", encoding="utf-8")
+        print(f"Report written: {args.output}", file=sys.stderr)
+    else:
+        print(payload)
+    return 0
+
+
+def _fill_serve_defaults(args) -> None:
+    """doctor/report reuse serve's flag structure for the shared config builder."""
+    for attr in ("port", "repo", "prefs_dir", "build_dir", "history_dir"):
+        if not hasattr(args, attr):
+            setattr(args, attr, None)
+    for attr in ("debug", "dev_allow_actions"):
+        if not hasattr(args, attr):
+            setattr(args, attr, False)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0].startswith("-"):
@@ -137,14 +165,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "setup":
         return cmd_setup(args)
     if args.command == "doctor":
-        # doctor reuses serve's flag structure; fill defaults for the shared config builder
-        for attr in ("port", "repo", "prefs_dir", "build_dir", "history_dir"):
-            if not hasattr(args, attr):
-                setattr(args, attr, None)
-        for attr in ("debug", "dev_allow_actions"):
-            if not hasattr(args, attr):
-                setattr(args, attr, False)
+        _fill_serve_defaults(args)
         return cmd_doctor(args)
+    if args.command == "report":
+        _fill_serve_defaults(args)
+        return cmd_report(args)
     return cmd_serve(args)
 
 
