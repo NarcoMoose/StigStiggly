@@ -17,7 +17,7 @@ from pathlib import Path
 DEFAULT_PREFS_DIR = Path("/Library/Preferences")
 MANAGED_PREFS_DIR = Path("/Library/Managed Preferences")
 DEFAULT_PORT = 8377
-CONFIG_KEYS = ("repo", "build_dir", "history_dir", "prefs_dir", "port")
+CONFIG_KEYS = ("repo", "build_dir", "history_dir", "prefs_dir", "port", "update_source", "update_check")
 
 
 def _invoker_home() -> Path:
@@ -72,7 +72,12 @@ def save_config_file(values: dict) -> Path:
     merged = {**load_config_file(), **{k: v for k, v in values.items() if k in CONFIG_KEYS and v is not None}}
     lines = ["# StigStiggly configuration (managed by `stigstiggly setup`)"]
     for key, value in merged.items():
-        lines.append(f"port = {int(value)}" if key == "port" else f'{key} = "{value}"')
+        if key == "port":
+            lines.append(f"port = {int(value)}")
+        elif isinstance(value, bool):
+            lines.append(f"{key} = {str(value).lower()}")
+        else:
+            lines.append(f'{key} = "{value}"')
     path = config_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     chown_to_invoker(path.parent)
@@ -157,6 +162,7 @@ class RepoInfo:
     path: Path
     os_version: str | None = None
     version_label: str | None = None
+    date: str | None = None
     host_os: str = field(default_factory=lambda: platform.mac_ver()[0])
 
     @property

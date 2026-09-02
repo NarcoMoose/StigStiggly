@@ -35,7 +35,8 @@ from .builder import (
 )
 from .history import diff_snapshots, load_history, record_snapshot
 from .report import build_report
-from .config import AppConfig, save_config_file
+from .updates import cached_updates, refresh_async
+from .config import AppConfig, managed_content_dir, save_config_file
 from .mscp_data import (
     REFERENCE_LABELS,
     Baseline,
@@ -182,8 +183,10 @@ def create_app(cfg: AppConfig) -> Flask:
     @app.context_processor
     def inject_globals():
         bdir = build_dir()
+        refresh_async(repo())  # cheap staleness check; network happens off-thread
         return {
             "cfg": cfg,
+            "updates": cached_updates(),
             "repo_info": load_repo_info(repo()) if repo() else None,
             "app_version": __version__,
             "scan_age_days": scan_age_days,
@@ -196,7 +199,7 @@ def create_app(cfg: AppConfig) -> Flask:
         }
 
     def get_baseline(name: str) -> Baseline:
-        for b in discover_baselines(cfg.prefs_dir, repo()):
+        for b in discover_baselines(cfg.prefs_dir, repo(), build_dir()):
             if b.name == name:
                 return b
         abort(404, f"No audit results found for baseline '{name}'")
@@ -213,7 +216,7 @@ def create_app(cfg: AppConfig) -> Flask:
     def overview():
         if (r := setup_redirect()) is not None:
             return r
-        baselines = discover_baselines(cfg.prefs_dir, repo())
+        baselines = discover_baselines(cfg.prefs_dir, repo(), build_dir())
         snapshot(*baselines)
         return render_template(
             "overview.html",
@@ -439,11 +442,14 @@ def create_app(cfg: AppConfig) -> Flask:
     @app.route("/setup")
     def setup_view():
         checks = run_doctor(replace(cfg, repo=repo(), repo_source=state["source"]))
+        current = repo()
+        managed = bool(current) and str(current).startswith(str(managed_content_dir()))
         return render_template(
             "setup.html",
             checks=checks,
             branch=branch_for_host(),
-            have_repo=repo() is not None,
+            have_repo=current is not None,
+            managed_content=managed,
         )
 
     @app.route("/setup/download", methods=["POST"])

@@ -52,9 +52,27 @@ stigstiggly report            # device compliance report as JSON
 stigstiggly serve --repo ...  # use an existing macos_security clone
 ```
 
-To scan a machine for the first time: open the **Builder**, generate a baseline
-(or download a bundle built elsewhere), run its compliance script with
-`--check`, and the dashboard picks up the results.
+To scan a machine for the first time: open the **Builder**, generate a baseline,
+and it appears on the dashboard immediately as "not scanned" — hit **Run scan**
+there (server running under sudo) and you're live. No terminal required.
+
+## Staying up to date
+
+StigStiggly checks once a day (cached, fully offline-tolerant) whether the app
+or your mSCP guidance content is outdated, and shows a pill in the header when
+either is. `stigstiggly doctor` reports the same with exact upgrade commands:
+
+```sh
+pipx upgrade stigstiggly                 # newer app version
+git -C <your-clone> pull                 # guidance updates, if you use a git clone
+stigstiggly setup                        # guidance updates for downloaded content
+                                         # (custom baselines and builds are preserved)
+```
+
+Set `update_check = false` in `~/.config/stigstiggly/config.toml` to disable
+the check entirely, or `update_source = "..."` to point at a fork or future
+home of this repo (GitHub redirects moved repos, so existing installs keep
+working either way).
 
 ## How it works
 

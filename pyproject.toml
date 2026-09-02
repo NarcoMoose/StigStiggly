@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stigstiggly"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local web dashboard for visualizing mSCP (macOS Security Compliance Project) scan results"
 requires-python = ">=3.12"
 dependencies = [
+    "certifi>=2024.0.0",  # python.org macOS builds don't use the system trust store
     "flask>=3.0,<4",
     "pyyaml>=6.0,<7",
     "xlwt==1.3.0",  # imported unconditionally by mSCP's generate_guidance.py

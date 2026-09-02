@@ -39,6 +39,7 @@ mSCP's own generator.</p>
         </td>
         <td class="col-actions">
           {% if c.build and c.build.script %}
+          <a class="btn btn-small" href="{{ url_for('baseline_view', name=c.template.name) }}">Open in dashboard</a>
           <a class="btn btn-small" href="{{ url_for('builder_bundle', name=c.template.name) }}">Download bundle</a>
           {% endif %}
           <a class="btn btn-small" href="{{ url_for('builder_new', template=c.template.name) }}">Edit &amp; regenerate</a>

@@ -113,6 +113,22 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
   two snapshots.
 - CSV export: `GET /baseline/<name>/export.csv` — one row per rule with section,
   status, severity, STIG IDs, and exemption info.
+- Updates (`updates.py`): daily-cached check of app version (raw pyproject.toml
+  on main of `update_source`, default this repo) and guidance freshness
+  (VERSION.yaml date vs the matching macos_security branch). Surfaced as topbar
+  pills, doctor checks (forced/synchronous), and a guidance-update button on
+  /setup for managed content (custom/ and build/ are preserved across content
+  re-downloads). Config: `update_check = false` disables; `update_source`
+  repoints. Page loads never block — cache reads only, refresh runs off-thread.
+  Bump `__version__` AND pyproject `version` together on every user-visible
+  change; the update check compares against pyproject on main.
+- All HTTPS fetches go through `bootstrap.http_open` (certifi-backed SSL
+  context) because python.org macOS builds don't read the system trust store —
+  plain urllib fails certificate verification out of the box.
+- Baseline discovery is build-dir aware: generated baselines with a compliance
+  script but no audit plist yet appear as "not scanned" cards with a working
+  Run scan button (`discover_baselines(..., build_dir)`), closing the
+  builder-to-dashboard loop without terminal use.
 - Device report (`report.py`): versioned JSON (`stigstiggly.device-report/1`) with
   host identity (hostname, OS, hardware serial), guidance version, and per-baseline
   counts/pct/failed-ids/exemption-reasons. `stigstiggly report [-o file]` CLI and

@@ -41,11 +41,30 @@ NIST <code>macos_security</code> guidance content (rules, baselines, fix command
     or point the app at an existing clone with <code>--repo</code>.</p>
 </div>
 {% else %}
+{% if managed_content and branch %}
+<div class="card">
+  <h2 class="card-heading">Update guidance content</h2>
+  <p class="prose">
+    {% if updates and updates.get('guidance') and updates['guidance']['outdated'] %}
+    A newer guidance release is available upstream
+    ({{ updates['guidance']['current_date'] }} &rarr; {{ updates['guidance']['latest_date'] }}).
+    {% else %}
+    Re-download the <code>{{ branch }}</code> branch to pick up upstream rule changes.
+    {% endif %}
+    Rules and templates are replaced with the fresh upstream tree; your custom
+    baselines, ODV overrides (<code>custom/</code>), and generated builds
+    (<code>build/</code>) are preserved.</p>
+  <div class="card-actions">
+    <button class="btn" id="setup-download">Update guidance content</button>
+    <span class="muted small" id="setup-status"></span>
+  </div>
+</div>
+{% endif %}
 <p><a href="{{ url_for('overview') }}">Continue to the dashboard &rarr;</a></p>
 {% endif %}
 {% endblock %}
 {% block scripts %}
-{% if not have_repo and branch %}
+{% if branch and (not have_repo or managed_content) %}
 <script>
 (function () {
   const btn = document.getElementById("setup-download");

@@ -55,6 +55,8 @@ code, .mono { font-family: var(--mono); font-size: 0.92em; }
 .pill-mode { color: var(--amber); border-color: #57431c; }
 .pill-ok { color: var(--green); border-color: #1f4635; }
 .pill-stig { color: var(--blue); border-color: #1f3c5c; }
+.pill-update { color: var(--blue); border-color: #1f3c5c; animation: pulse 2.2s ease-in-out infinite; }
+.pill-update:hover { text-decoration: none; border-color: var(--blue); }
 .chip { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12.5px; background: var(--panel-2); }
 .chip-pass { color: var(--green); }
 .chip-fail { color: var(--red); }

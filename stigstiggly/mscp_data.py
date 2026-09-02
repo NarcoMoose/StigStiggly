@@ -172,6 +172,7 @@ def load_repo_info(repo: Path) -> RepoInfo:
         path=repo,
         os_version=str(data["os"]) if data.get("os") else None,
         version_label=data.get("version"),
+        date=str(data["date"]) if data.get("date") else None,
     )
 
 
@@ -373,10 +374,21 @@ def load_baseline(plist_path: Path, repo: Path) -> Baseline:
     )
 
 
-def discover_baselines(prefs_dir: Path, repo: Path) -> list[Baseline]:
-    """Find every org.*.audit.plist in prefs_dir and load it as a Baseline."""
+def discover_baselines(prefs_dir: Path, repo: Path, build_dir: Path | None = None) -> list[Baseline]:
+    """Find every baseline with scan results (org.*.audit.plist) — plus, when
+    build_dir is given, generated baselines that have a compliance script but
+    have never been scanned (their expected plist path doesn't exist yet), so
+    freshly built baselines are usable from the dashboard immediately."""
     plists = sorted(p for p in prefs_dir.glob("org.*.audit.plist") if AUDIT_PLIST_RE.match(p.name))
-    return [load_baseline(p, repo) for p in plists]
+    baselines = [load_baseline(p, repo) for p in plists]
+    if build_dir and build_dir.is_dir():
+        seen = {b.name for b in baselines}
+        for script in sorted(build_dir.glob("*/*_compliance.sh")):
+            name = script.parent.name
+            if name not in seen:
+                seen.add(name)
+                baselines.append(load_baseline(prefs_dir / f"org.{name}.audit.plist", repo))
+    return baselines
 
 
 # --------------------------------------------------------------------------

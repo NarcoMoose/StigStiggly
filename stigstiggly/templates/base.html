@@ -25,13 +25,26 @@
       {% endif %}
       {% if repo_info %}
         {% if repo_info.version_label %}
-          <span class="meta-item" title="{{ repo_info.path }}">{{ repo_info.version_label }}</span>
+          <span class="meta-item" title="{{ repo_info.path }}{% if repo_info.date %} — released {{ repo_info.date }}{% endif %}">
+            {{ repo_info.version_label }}{% if repo_info.date %} <span class="muted">({{ repo_info.date }})</span>{% endif %}</span>
         {% endif %}
         {% if repo_info.matches_host %}
           <span class="pill pill-ok" title="Guidance targets macOS {{ repo_info.os_version }}; host is {{ repo_info.host_os }}">macOS {{ repo_info.host_os }} ✓</span>
         {% endif %}
       {% else %}
         <a class="pill pill-mode" href="{{ url_for('setup_view') }}">setup required</a>
+      {% endif %}
+      {% if updates and not updates.get('disabled') %}
+        {% if updates.get('app') and updates['app']['outdated'] %}
+          <a class="pill pill-update" href="{{ updates['app']['source'] }}" target="_blank" rel="noopener"
+             title="You run v{{ updates['app']['current'] }}; v{{ updates['app']['latest'] }} is available. Upgrade with: pipx upgrade stigstiggly">
+            update v{{ updates['app']['latest'] }} available</a>
+        {% endif %}
+        {% if updates.get('guidance') and updates['guidance']['outdated'] %}
+          <a class="pill pill-update" href="{{ url_for('setup_view') }}"
+             title="Guidance content {{ updates['guidance']['current_date'] }} < upstream {{ updates['guidance']['latest_date'] }} ({{ updates['guidance']['branch'] }} branch)">
+            guidance update available</a>
+        {% endif %}
       {% endif %}
     </div>
   </header>

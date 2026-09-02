@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import platform
 import shutil
+import ssl
 import tarfile
 import tempfile
 import urllib.request
@@ -43,6 +44,21 @@ def content_url(branch: str) -> str:
     return os.environ.get("STIGSTIGGLY_CONTENT_URL") or TARBALL_URL.format(branch=branch)
 
 
+def http_open(url: str, timeout: int = 60):
+    """urlopen with a certifi-backed SSL context: python.org macOS Pythons don't
+    read the system keychain, so default verification fails out of the box."""
+    if not url.startswith("https://"):
+        return urllib.request.urlopen(url, timeout=timeout)  # file:// (tests), http
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+
+        ctx.load_verify_locations(certifi.where())
+    except ImportError:
+        pass  # fall back to system trust; works on non-python.org builds
+    return urllib.request.urlopen(url, timeout=timeout, context=ctx)
+
+
 def download_guidance(branch: str, progress=lambda msg: None) -> Path:
     """Download and extract the guidance tarball for `branch`.
 
@@ -55,7 +71,7 @@ def download_guidance(branch: str, progress=lambda msg: None) -> Path:
     with tempfile.TemporaryDirectory(prefix="stigstiggly-bootstrap-") as tmp:
         tmp_path = Path(tmp)
         tarball = tmp_path / "content.tar.gz"
-        with urllib.request.urlopen(url, timeout=60) as resp, tarball.open("wb") as out:
+        with http_open(url, timeout=60) as resp, tarball.open("wb") as out:
             shutil.copyfileobj(resp, out)
         progress(f"Downloaded {tarball.stat().st_size // 1024} KiB, extracting...")
         with tarfile.open(tarball) as tf:
@@ -68,6 +84,17 @@ def download_guidance(branch: str, progress=lambda msg: None) -> Path:
         chown_to_invoker(dest.parent.parent)
         chown_to_invoker(dest.parent)
         if dest.exists():
+            # Preserve user data across content updates: custom/ holds baselines
+            # and ODV overrides created by the builder; build/ holds generated
+            # scripts and bundles. Everything else is replaced wholesale.
+            for keep in ("custom", "build"):
+                old = dest / keep
+                if old.exists():
+                    progress(f"Preserving existing {keep}/ across the update")
+                    replacement = root / keep
+                    if replacement.exists():
+                        shutil.rmtree(replacement)
+                    shutil.move(str(old), str(replacement))
             shutil.rmtree(dest)
         shutil.move(str(root), dest)
     _chown_tree(dest)
@@ -150,6 +177,34 @@ def run_doctor(cfg) -> list[Check]:
         or "not installed — mSCP's generator bundler-installs it into the repo on first doc generation",
         warn=True,
     )
+
+    from .updates import check_updates
+
+    status = check_updates(cfg.repo, force=True)
+    if status.get("disabled"):
+        add("Updates", True, "checking disabled via config (update_check = false)", warn=True)
+    else:
+        app_info = status.get("app") or {}
+        if app_info.get("latest") is None:
+            add("App version", True, f"v{app_info.get('current')} (upstream unreachable — offline?)", warn=True)
+        elif app_info.get("outdated"):
+            add("App version", False,
+                f"v{app_info['current']} — v{app_info['latest']} available (pipx upgrade stigstiggly)", warn=True)
+        else:
+            add("App version", True, f"v{app_info.get('current')} (latest)")
+        guidance = status.get("guidance") or {}
+        if guidance.get("latest_date") is None:
+            add("Guidance updates", True, "upstream release date unknown (offline or no matching branch)", warn=True)
+        elif guidance.get("outdated"):
+            how = (
+                f"run `git -C {cfg.repo} pull`"
+                if cfg.repo and (cfg.repo / ".git").exists()
+                else "update via /setup or `stigstiggly setup`"
+            )
+            add("Guidance updates", False,
+                f"local {guidance['current_date']} < upstream {guidance['latest_date']} — {how}", warn=True)
+        else:
+            add("Guidance updates", True, f"current ({guidance.get('current_date')})")
     return checks
 
 

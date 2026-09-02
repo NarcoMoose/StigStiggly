@@ -37,7 +37,8 @@ def _hardware_serial() -> str | None:
 
 def build_report(cfg: AppConfig) -> dict:
     """Assemble the device report. Read-only; works unprivileged."""
-    baselines = discover_baselines(cfg.prefs_dir, cfg.repo) if cfg.repo else []
+    build_dir = cfg.build_dir or (cfg.repo / "build" if cfg.repo else None)
+    baselines = discover_baselines(cfg.prefs_dir, cfg.repo, build_dir) if cfg.repo else []
     guidance = None
     if cfg.repo:
         info = load_repo_info(cfg.repo)
