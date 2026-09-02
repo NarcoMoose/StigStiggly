@@ -36,7 +36,8 @@
     function attach(job, from) {
       panel.hidden = false;
       cmdEl.textContent = job.command;
-      setStatus(job.kind.includes("fix") ? "remediating" : "scanning", "badge-running");
+      const labels = { scan: "scanning", fix: "remediating", rulefix: "remediating", generate: "generating" };
+      setStatus(labels[job.kind] || "running", "badge-running");
       setButtons(true);
       if (source) source.close();
       source = new EventSource("/job/" + job.id + "/stream?from=" + (from || 0));

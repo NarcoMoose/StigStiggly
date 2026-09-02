@@ -12,6 +12,10 @@
     <div class="brand">
       <a href="{{ url_for('overview') }}" class="brand-name">StigStiggly</a>
       <span class="brand-sub">mSCP Compliance Dashboard</span>
+      <nav class="topnav">
+        <a href="{{ url_for('overview') }}">Dashboard</a>
+        <a href="{{ url_for('builder_index') }}">Builder</a>
+      </nav>
     </div>
     <div class="topbar-meta">
       {% if can_act %}

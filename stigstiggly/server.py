@@ -23,6 +23,16 @@ from .actions import (
     set_exemption,
 )
 from .bootstrap import branch_for_host, download_guidance, run_doctor
+from .builder import (
+    BuilderError,
+    build_catalog,
+    built_artifacts,
+    bundle_zip,
+    create_custom_baseline,
+    find_template,
+    generation_command,
+    list_templates,
+)
 from .history import diff_snapshots, load_history, record_snapshot
 from .config import AppConfig, save_config_file
 from .mscp_data import (
@@ -345,6 +355,83 @@ def create_app(cfg: AppConfig) -> Flask:
         except subprocess.CalledProcessError as exc:
             return jsonify(error=f"defaults write failed: {exc.stderr.strip() or exc}"), 500
         return jsonify(ok=True, exempt=exempt, reason=reason if exempt else None)
+
+    # -- baseline builder ------------------------------------------------------
+
+    @app.route("/builder")
+    def builder_index():
+        if (r := setup_redirect()) is not None:
+            return r
+        templates = list_templates(repo())
+        customs = [
+            {"template": t, "build": built_artifacts(repo(), t.name)}
+            for t in templates
+            if t.custom
+        ]
+        return render_template(
+            "builder.html",
+            templates=[t for t in templates if not t.custom],
+            customs=customs,
+        )
+
+    @app.route("/builder/new")
+    def builder_new():
+        if (r := setup_redirect()) is not None:
+            return r
+        template = find_template(repo(), request.args.get("template", ""))
+        if template is None:
+            abort(404, "unknown template baseline")
+        return render_template(
+            "builder_new.html",
+            catalog=build_catalog(repo(), template),
+        )
+
+    @app.route("/builder/create", methods=["POST"])
+    def builder_create():
+        if (err := setup_error()) is not None:
+            return err
+        body = request.get_json(silent=True) or {}
+        template = find_template(repo(), str(body.get("template", "")))
+        if template is None:
+            return jsonify(error="unknown template baseline"), 404
+        try:
+            baseline_path = create_custom_baseline(
+                repo(),
+                name=str(body.get("name", "")).strip(),
+                title=str(body.get("title", "")).strip(),
+                description=str(body.get("description", "")).strip(),
+                template=template,
+                rule_ids=[str(r) for r in body.get("rules") or []],
+                odv_values={str(k): str(v) for k, v in (body.get("odvs") or {}).items()},
+            )
+        except BuilderError as exc:
+            return jsonify(error=str(exc)), 400
+        except OSError as exc:
+            return jsonify(error=f"could not write baseline files: {exc}"), 500
+        try:
+            job = jobs.start(
+                str(body.get("name")), "generate", generation_command(repo(), baseline_path)
+            )
+        except JobInProgress as exc:
+            return jsonify(error=str(exc)), 409
+        return jsonify(job=job.to_dict()), 202
+
+    @app.route("/builder/bundle/<name>.zip")
+    def builder_bundle(name: str):
+        if (r := setup_redirect()) is not None:
+            return r
+        template = find_template(repo(), name)
+        artifacts = built_artifacts(repo(), name)
+        if template is None or not template.custom or artifacts is None:
+            abort(404, f"no generated build found for '{name}' — create it in the builder first")
+        info = load_repo_info(repo())
+        payload = bundle_zip(repo(), name, info.version_label)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+        return Response(
+            payload,
+            mimetype="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{name}_bundle_{stamp}.zip"'},
+        )
 
     # -- setup mode -----------------------------------------------------------
 

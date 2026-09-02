@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; Builder{% endblock %}
+{% block content %}
+<h1 class="page-title">Baseline Builder</h1>
+<p class="muted">Create a tailored baseline from an mSCP template, tune rules and
+organization-defined values, then generate a distributable compliance bundle using
+mSCP's own generator.</p>
+
+{% include "activity.html" %}
+
+<div class="card">
+  <h2 class="card-heading">Start from a template</h2>
+  <div class="template-grid">
+    {% for t in templates %}
+    <a class="template-card" href="{{ url_for('builder_new', template=t.name) }}">
+      <span class="template-name">{{ t.name }}</span>
+      <span class="muted small template-title">{{ t.title }}</span>
+      <span class="pill">{{ t.rule_count }} rules</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="card-heading">Your custom baselines</h2>
+  {% if not customs %}
+  <p class="muted">None yet — pick a template above to create one.</p>
+  {% else %}
+  <table class="rule-table">
+    <thead><tr><th>Name</th><th>Title</th><th>Generated</th><th class="col-actions">Actions</th></tr></thead>
+    <tbody>
+      {% for c in customs %}
+      <tr>
+        <td class="mono">{{ c.template.name }}</td>
+        <td>{{ c.template.title }}</td>
+        <td class="muted small">
+          {% if c.build %}{{ c.build.mtime.strftime('%Y-%m-%d %H:%M') }} ({{ c.build.file_count }} files)
+          {% else %}not generated yet{% endif %}
+        </td>
+        <td class="col-actions">
+          {% if c.build and c.build.script %}
+          <a class="btn btn-small" href="{{ url_for('builder_bundle', name=c.template.name) }}">Download bundle</a>
+          {% endif %}
+          <a class="btn btn-small" href="{{ url_for('builder_new', template=c.template.name) }}">Edit &amp; regenerate</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='activity.js') }}"></script>{% endblock %}

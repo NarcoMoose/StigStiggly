@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; New baseline{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{{ url_for('builder_index') }}">Builder</a> / <span>new from {{ catalog.template.name }}</span></nav>
+<h1 class="page-title">New baseline from {{ catalog.template.name }}</h1>
+<p class="muted small">{{ catalog.template.title }}</p>
+
+<div class="card builder-meta">
+  <div class="builder-fields">
+    <label>Name <input type="text" id="bl-name" placeholder="e.g. STIG-NoSmartcard" maxlength="64"
+      value="{{ catalog.template.name if catalog.template.name not in ['DISA-STIG'] and catalog.template.parent_values == 'custom' else '' }}"></label>
+    <label>Title <input type="text" id="bl-title" placeholder="Shown in generated docs (optional)"></label>
+    <label>Description <input type="text" id="bl-desc" placeholder="What this baseline is for (optional)"></label>
+  </div>
+  <p class="muted small">Name is used for the compliance script and audit plist
+    (<code>org.&lt;name&gt;.audit.plist</code>). Letters, digits, dashes, underscores.</p>
+</div>
+
+<div class="filter-bar">
+  <input type="search" id="rule-filter" placeholder="Search rules, titles, tags&hellip;" autocomplete="off">
+  <div class="filter-group" id="sev-filter">
+    <button class="fbtn active" data-value="">Any severity</button>
+    <button class="fbtn" data-value="high">High</button>
+    <button class="fbtn" data-value="medium">Medium</button>
+    <button class="fbtn" data-value="low">Low</button>
+  </div>
+  <select id="tag-filter" class="tag-select">
+    <option value="">Any framework tag</option>
+    {% for tag in catalog.tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}
+  </select>
+  <label class="check-label"><input type="checkbox" id="selected-only"> selected only</label>
+  <span class="muted small" id="filter-count"></span>
+</div>
+
+{% for section in catalog.sections %}
+<div class="card builder-section" data-section="{{ section.key }}">
+  <div class="builder-section-head">
+    <h2 class="card-heading">{{ section.name }} <span class="muted small">(<span class="sec-count"></span>)</span></h2>
+    <span class="sec-links small"><a href="#" class="sec-all">select visible</a> &middot; <a href="#" class="sec-none">clear visible</a></span>
+  </div>
+  {% for r in section.rules %}
+  <div class="brule" data-id="{{ r.id }}" data-severity="{{ r.severity }}" data-tags="{{ r.tags | join(' ') }}"
+       data-text="{{ (r.id ~ ' ' ~ r.title ~ ' ' ~ (r.tags | join(' '))) | lower }}">
+    <label class="brule-main">
+      <input type="checkbox" class="brule-check" {% if r.in_template %}checked{% endif %}>
+      <span class="mono brule-id">{{ r.id }}</span>
+      <span class="brule-title">{{ r.title }}</span>
+      <span class="sev-label sev-{{ r.severity }}">{{ r.severity }}</span>
+    </label>
+    {% if r.odv %}
+    <div class="brule-odv">
+      <input type="text" class="odv-input" data-rule="{{ r.id }}" value="{{ r.odv.default }}"
+             title="{{ r.odv.hint }}" placeholder="{{ r.odv.default or 'value' }}">
+      <span class="muted small odv-hint">{{ r.odv.hint }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+<div class="builder-bar">
+  <span id="selected-count" class="small"></span>
+  <span class="muted small" id="create-status"></span>
+  <button class="btn btn-primary" id="create-btn"
+          data-template="{{ catalog.template.name }}"
+          data-endpoint="{{ url_for('builder_create') }}"
+          data-done="{{ url_for('builder_index') }}">Create &amp; generate</button>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='builder.js') }}"></script>{% endblock %}

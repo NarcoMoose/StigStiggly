@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-import subprocess
 import tarfile
 import tempfile
 import urllib.request
@@ -144,22 +143,19 @@ def run_doctor(cfg) -> list[Check]:
         "root — scans/remediation enabled" if cfg.can_act else "unprivileged — dashboard is read-only (use sudo for actions)",
         warn=True,
     )
-    asciidoctor = shutil.which("asciidoctor") or _gem_asciidoctor(cfg.repo)
+    asciidoctor = shutil.which("asciidoctor") or _repo_asciidoctor(cfg.repo)
     add(
         "asciidoctor (optional)", bool(asciidoctor),
-        asciidoctor or "not found — baseline-builder doc bundles will omit HTML/PDF", warn=True,
+        asciidoctor
+        or "not installed — mSCP's generator bundler-installs it into the repo on first doc generation",
+        warn=True,
     )
     return checks
 
 
-def _gem_asciidoctor(repo: Path | None) -> str | None:
-    """mSCP clones often vendor asciidoctor via bundler; detect that too."""
-    if repo and (repo / "mscp_gems" / "bin" / "asciidoctor").is_file():
-        return str(repo / "mscp_gems" / "bin" / "asciidoctor")
-    try:
-        out = subprocess.run(
-            ["gem", "list", "-i", "asciidoctor"], capture_output=True, text=True, timeout=10
-        )
-        return "asciidoctor (ruby gem)" if out.stdout.strip() == "true" else None
-    except (OSError, subprocess.TimeoutExpired):
-        return None
+def _repo_asciidoctor(repo: Path | None) -> str | None:
+    """generate_guidance.py installs asciidoctor binstubs into <repo>/bin via
+    bundler (--binstubs --path mscp_gems); detect that repo-local install."""
+    if repo and (repo / "bin" / "asciidoctor").is_file():
+        return str(repo / "bin" / "asciidoctor")
+    return None

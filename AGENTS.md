@@ -112,3 +112,16 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
   two snapshots.
 - CSV export: `GET /baseline/<name>/export.csv` — one row per rule with section,
   status, severity, STIG IDs, and exemption info.
+- Baseline builder (`builder.py`, `/builder` routes): creates tailored baselines
+  from a template using mSCP's own conventions — `custom/baselines/<name>.yaml`
+  with `parent_values: custom`, plus `custom/rules/<id>.yaml` ODV overrides
+  (`odv: {custom: ...}`) written for every selected ODV-bearing rule so
+  generation resolves exactly the values shown in the UI. Generation shells out
+  to `<repo>/scripts/generate_guidance.py <baseline> -s -p -x` (requires the
+  `xlwt` dep; titles must contain a colon — builder auto-prefixes "macOS <ver>:").
+  Docs: the generator bundler-installs asciidoctor into `<repo>/bin` +
+  `<repo>/mscp_gems` on first run if missing. Bundle download zips
+  `<repo>/build/<name>/` + BUILD_INFO.txt. Builder works unprivileged (writes
+  only into the guidance repo, never system state). Custom baselines are
+  auto-usable locally: build output lands in the standard build dir, so scan
+  actions pick them up once the generated script is run with --check.
