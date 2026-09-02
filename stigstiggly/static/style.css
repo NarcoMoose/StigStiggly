@@ -241,6 +241,14 @@ a.btn:hover { text-decoration: none; }
 .pill-added { color: var(--blue); border-color: #1f3c5c; }
 .pill-removed { color: var(--gray); }
 
+/* setup page */
+.doctor-table td { padding: 5px 0; }
+.doctor-table th { padding-right: 18px; }
+.doctor-mark { width: 26px; font-weight: 700; }
+.doctor-ok { color: var(--green); }
+.doctor-warn { color: var(--amber); }
+.doctor-fail { color: var(--red); }
+
 /* rule detail */
 .rule-head { margin-bottom: 20px; }
 .rule-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; }

@@ -7,9 +7,11 @@ import csv
 import io
 import secrets
 import subprocess
+from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 
-from flask import Flask, Response, abort, jsonify, render_template, request
+from flask import Flask, Response, abort, jsonify, redirect, render_template, request, url_for
 
 from . import __version__
 from .actions import (
@@ -20,8 +22,9 @@ from .actions import (
     rule_fix_blocked_reason,
     set_exemption,
 )
+from .bootstrap import branch_for_host, download_guidance, run_doctor
 from .history import diff_snapshots, load_history, record_snapshot
-from .config import AppConfig
+from .config import AppConfig, save_config_file
 from .mscp_data import (
     REFERENCE_LABELS,
     Baseline,
@@ -134,6 +137,27 @@ def create_app(cfg: AppConfig) -> Flask:
     csrf_token = secrets.token_hex(16)
     jobs = JobManager()
     allowed_hosts = {f"127.0.0.1:{cfg.port}", f"localhost:{cfg.port}"}
+    # Guidance content can be installed at runtime via /setup, so the resolved
+    # repo lives in mutable state rather than the frozen config.
+    state = {"repo": cfg.repo, "source": cfg.repo_source}
+
+    def repo() -> Path | None:
+        return state["repo"]
+
+    def build_dir() -> Path | None:
+        if cfg.build_dir:
+            return cfg.build_dir
+        return state["repo"] / "build" if state["repo"] else None
+
+    def setup_redirect():
+        """Where GET pages land while no guidance content is available."""
+        return redirect(url_for("setup_view")) if repo() is None else None
+
+    def setup_error():
+        """JSON guard for action endpoints while in setup mode."""
+        if repo() is None:
+            return jsonify(error="guidance content not set up — visit /setup first"), 503
+        return None
 
     @app.before_request
     def guard_requests():
@@ -146,20 +170,22 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.context_processor
     def inject_globals():
+        bdir = build_dir()
         return {
             "cfg": cfg,
-            "repo_info": load_repo_info(cfg.repo),
+            "repo_info": load_repo_info(repo()) if repo() else None,
             "app_version": __version__,
             "scan_age_days": scan_age_days,
             "stale_after": STALE_AFTER_DAYS,
             "ref_label": lambda key: REFERENCE_LABELS.get(key, key.replace("_", " ").upper()),
             "can_act": cfg.can_act,
             "csrf_token": csrf_token,
-            "find_script": lambda name: find_compliance_script(cfg.effective_build_dir, name),
+            "find_script": (lambda name: find_compliance_script(bdir, name) if bdir else None),
+            "build_dir_display": str(bdir) if bdir else "(unset)",
         }
 
     def get_baseline(name: str) -> Baseline:
-        for b in discover_baselines(cfg.prefs_dir, cfg.repo):
+        for b in discover_baselines(cfg.prefs_dir, repo()):
             if b.name == name:
                 return b
         abort(404, f"No audit results found for baseline '{name}'")
@@ -174,7 +200,9 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.route("/")
     def overview():
-        baselines = discover_baselines(cfg.prefs_dir, cfg.repo)
+        if (r := setup_redirect()) is not None:
+            return r
+        baselines = discover_baselines(cfg.prefs_dir, repo())
         snapshot(*baselines)
         return render_template(
             "overview.html",
@@ -184,6 +212,8 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.route("/baseline/<name>")
     def baseline_view(name: str):
+        if (r := setup_redirect()) is not None:
+            return r
         baseline = get_baseline(name)
         snapshot(baseline)
         history = load_history(cfg.history_dir, baseline.name)
@@ -198,6 +228,8 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.route("/baseline/<name>/export.csv")
     def export_csv(name: str):
+        if (r := setup_redirect()) is not None:
+            return r
         baseline = get_baseline(name)
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -220,6 +252,8 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.route("/baseline/<name>/rule/<rule_id>")
     def rule_view(name: str, rule_id: str):
+        if (r := setup_redirect()) is not None:
+            return r
         baseline = get_baseline(name)
         rule = next((r for r in baseline.rules if r.id == rule_id), None)
         if rule is None:
@@ -242,14 +276,15 @@ def create_app(cfg: AppConfig) -> Flask:
     # -- action API ----------------------------------------------------------
 
     def start_script_job(name: str, kind: str, flag: str):
+        if (err := setup_error()) is not None:
+            return err
         if not cfg.can_act:
             return jsonify(error=f"{kind} requires root; restart with: sudo stigstiggly serve"), 403
         get_baseline(name)  # 404 if unknown
-        script = find_compliance_script(cfg.effective_build_dir, name)
+        bdir = build_dir()
+        script = find_compliance_script(bdir, name)
         if script is None:
-            return jsonify(
-                error=f"no compliance script found under {cfg.effective_build_dir / name}"
-            ), 404
+            return jsonify(error=f"no compliance script found under {bdir / name}"), 404
         try:
             job = jobs.start(name, kind, ["/bin/zsh", str(script), flag])
         except JobInProgress as exc:
@@ -266,6 +301,8 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.route("/baseline/<name>/rule/<rule_id>/fix", methods=["POST"])
     def start_rule_fix(name: str, rule_id: str):
+        if (err := setup_error()) is not None:
+            return err
         if not cfg.can_act:
             return jsonify(error="remediation requires root; restart with: sudo stigstiggly serve"), 403
         baseline = get_baseline(name)
@@ -288,6 +325,8 @@ def create_app(cfg: AppConfig) -> Flask:
 
     @app.route("/baseline/<name>/rule/<rule_id>/exempt", methods=["POST"])
     def set_rule_exemption(name: str, rule_id: str):
+        if (err := setup_error()) is not None:
+            return err
         if not cfg.can_act:
             return jsonify(error="managing exemptions requires root; restart with: sudo stigstiggly serve"), 403
         baseline = get_baseline(name)
@@ -306,6 +345,34 @@ def create_app(cfg: AppConfig) -> Flask:
         except subprocess.CalledProcessError as exc:
             return jsonify(error=f"defaults write failed: {exc.stderr.strip() or exc}"), 500
         return jsonify(ok=True, exempt=exempt, reason=reason if exempt else None)
+
+    # -- setup mode -----------------------------------------------------------
+
+    @app.route("/setup")
+    def setup_view():
+        checks = run_doctor(replace(cfg, repo=repo(), repo_source=state["source"]))
+        return render_template(
+            "setup.html",
+            checks=checks,
+            branch=branch_for_host(),
+            have_repo=repo() is not None,
+        )
+
+    @app.route("/setup/download", methods=["POST"])
+    def setup_download():
+        branch = branch_for_host()
+        if branch is None:
+            return jsonify(error="no known macos_security branch for this macOS version; pass --repo or use `stigstiggly setup --branch`"), 400
+        try:
+            dest = download_guidance(branch)
+        except Exception as exc:  # noqa: BLE001 - report network/extract errors to the UI
+            return jsonify(error=f"download failed: {exc}"), 502
+        try:
+            save_config_file({"repo": str(dest)})
+        except OSError as exc:
+            return jsonify(error=f"downloaded, but could not write config file: {exc}"), 500
+        state["repo"], state["source"] = dest, "downloaded content"
+        return jsonify(ok=True, path=str(dest))
 
     @app.route("/job")
     def job_state():

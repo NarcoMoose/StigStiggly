@@ -160,9 +160,10 @@ _rule_index_cache: dict[Path, tuple[float, dict[str, RuleMeta]]] = {}
 
 def _load_yaml(path: Path) -> dict:
     try:
-        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (yaml.YAMLError, OSError):
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, OSError, UnicodeDecodeError):
         return {}
+    return data if isinstance(data, dict) else {}
 
 
 def load_repo_info(repo: Path) -> RepoInfo:
@@ -212,7 +213,11 @@ def _parse_rule_file(path: Path) -> RuleMeta | None:
 
 def load_rule_index(repo: Path) -> dict[str, RuleMeta]:
     """Index all rule YAMLs by rule id. custom/rules overrides rules/."""
-    files = sorted(repo.glob("rules/**/*.yaml")) + sorted(repo.glob("custom/rules/**/*.yaml"))
+    files = [
+        f
+        for f in sorted(repo.glob("rules/**/*.yaml")) + sorted(repo.glob("custom/rules/**/*.yaml"))
+        if not f.name.startswith("._")  # AppleDouble metadata files
+    ]
     newest = max((f.stat().st_mtime for f in files), default=0.0)
     cached = _rule_index_cache.get(repo)
     if cached and cached[0] == newest:

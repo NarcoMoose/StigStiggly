@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}StigStiggly &middot; Setup{% endblock %}
+{% block content %}
+<h1 class="page-title">Setup</h1>
+<p class="muted">StigStiggly visualizes mSCP scan results by joining them with the
+NIST <code>macos_security</code> guidance content (rules, baselines, fix commands).
+{% if not have_repo %}No guidance content was found on this machine yet.{% endif %}</p>
+
+<div class="card">
+  <h2 class="card-heading">Environment</h2>
+  <table class="ref-table doctor-table">
+    {% for check in checks %}
+    <tr>
+      <td class="doctor-mark doctor-{{ check.status }}">{{ {'ok': '✓', 'warn': '!', 'fail': '✗'}[check.status] }}</td>
+      <th>{{ check.label }}</th>
+      <td>{{ check.detail }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if not have_repo %}
+<div class="card">
+  <h2 class="card-heading">Get guidance content</h2>
+  {% if branch %}
+  <p class="prose">Download the <code>{{ branch }}</code> branch of
+    <code>usnistgov/macos_security</code> (matched to this machine's macOS version,
+    roughly 15&nbsp;MB) into <code>~/.local/share/stigstiggly/</code>. Nothing outside
+    that folder and the config file is touched.</p>
+  <div class="card-actions">
+    <button class="btn" id="setup-download">Download guidance content</button>
+    <span class="muted small" id="setup-status"></span>
+  </div>
+  {% else %}
+  <p class="prose stale">This macOS version has no known matching branch. Pass
+    <code>--repo /path/to/macos_security</code> or run
+    <code>stigstiggly setup --branch &lt;name&gt;</code> with a branch from the
+    upstream repository.</p>
+  {% endif %}
+  <p class="muted small">Alternative: run <code>stigstiggly setup</code> in a terminal,
+    or point the app at an existing clone with <code>--repo</code>.</p>
+</div>
+{% else %}
+<p><a href="{{ url_for('overview') }}">Continue to the dashboard &rarr;</a></p>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if not have_repo and branch %}
+<script>
+(function () {
+  const btn = document.getElementById("setup-download");
+  const status = document.getElementById("setup-status");
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    status.textContent = "Downloading… this can take a minute.";
+    try {
+      const resp = await fetch("/setup/download", { method: "POST", headers: { "X-CSRF-Token": csrf } });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || resp.statusText);
+      status.textContent = "Installed at " + data.path + " — loading dashboard…";
+      setTimeout(() => (window.location = "/"), 800);
+    } catch (err) {
+      status.textContent = "Failed: " + err.message;
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

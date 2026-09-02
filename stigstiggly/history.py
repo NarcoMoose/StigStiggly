@@ -10,25 +10,11 @@ never modified here.
 from __future__ import annotations
 
 import json
-import os
 import platform
-import pwd
 from pathlib import Path
 
+from .config import chown_to_invoker as _chown_to_invoker
 from .mscp_data import Baseline
-
-
-def _chown_to_invoker(path: Path) -> None:
-    """When running under sudo, hand snapshot files to the invoking user so
-    later unprivileged sessions can keep appending to them."""
-    sudo_user = os.environ.get("SUDO_USER")
-    if os.geteuid() != 0 or not sudo_user:
-        return
-    try:
-        rec = pwd.getpwnam(sudo_user)
-        os.chown(path, rec.pw_uid, rec.pw_gid)
-    except (KeyError, OSError):
-        pass
 
 
 def history_file(history_dir: Path, baseline_name: str) -> Path:

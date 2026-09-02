@@ -48,7 +48,7 @@
         {% if can_act %}
           {% set script = find_script(b.name) %}
           <button class="btn scan-btn" data-baseline="{{ b.name }}"
-                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ cfg.effective_build_dir / b.name }}"{% endif %}>
+                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ build_dir_display }}/{{ b.name }}"{% endif %}>
             Run scan</button>
         {% else %}
           <button class="btn" disabled data-locked="1" title="Start with `sudo stigstiggly serve` to run scans">Run scan</button>

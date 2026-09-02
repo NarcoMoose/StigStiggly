@@ -17,13 +17,23 @@ python3 -m venv .venv
 .venv/bin/stigstiggly serve            # http://127.0.0.1:8377, read-only
 sudo .venv/bin/stigstiggly serve       # scan actions enabled
 .venv/bin/stigstiggly serve --debug    # auto-reload during development (refused as root)
+.venv/bin/stigstiggly setup            # first-run: download guidance content, write config
+.venv/bin/stigstiggly doctor           # diagnose environment (content, scripts, privileges)
 ```
 
-Defaults: reads scan results from `/Library/Preferences/org.*.audit.plist`, rule
-metadata from `~/Developer/macos_security` (override with `--repo` or `$STIGSTIGGLY_REPO`),
-and compliance scripts from `<repo>/build/<BASELINE>/` (override with `--build-dir`).
-Scan-history snapshots live in `~/.local/share/stigstiggly/history/` (override with
-`--history-dir`).
+Settings precedence: CLI flag > `$STIGSTIGGLY_REPO` > `~/.config/stigstiggly/config.toml`
+> bootstrap-downloaded content (`~/.local/share/stigstiggly/content/`) > legacy
+`~/Developer/macos_security` guess. Scan results come from
+`/Library/Preferences/org.*.audit.plist`; compliance scripts from
+`<repo>/build/<BASELINE>/` (`--build-dir` overrides); history snapshots from
+`~/.local/share/stigstiggly/history/` (`--history-dir` overrides).
+
+Fresh machines: `serve` with no guidance content enters setup mode — every page
+redirects to `/setup`, which offers a one-click download of the branch matching
+the host macOS (26→tahoe, 15→sequoia, ...) as a GitHub tarball (no git needed);
+the running server picks the content up without a restart. `stigstiggly setup`
+is the CLI equivalent. `STIGSTIGGLY_CONTENT_URL` overrides the tarball URL
+(used by tests with a `file://` archive).
 
 ## Testing without touching real system data
 

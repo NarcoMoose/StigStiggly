@@ -33,10 +33,10 @@
         {% if can_act %}
           {% set script = find_script(baseline.name) %}
           <button class="btn scan-btn" data-baseline="{{ baseline.name }}"
-                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ cfg.effective_build_dir / baseline.name }}"{% endif %}>
+                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ build_dir_display }}/{{ baseline.name }}"{% endif %}>
             Run scan</button>
           <button class="btn btn-danger" id="fix-open"
-                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ cfg.effective_build_dir / baseline.name }}"
+                  {% if not script %}disabled data-locked="1" title="No compliance script found under {{ build_dir_display }}/{{ baseline.name }}"
                   {% elif not fail_count %}disabled data-locked="1" title="No failed (non-exempt) rules to remediate"{% endif %}>
             Remediate {{ fail_count }} failed</button>
         {% else %}

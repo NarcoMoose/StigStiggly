@@ -19,15 +19,19 @@
       {% else %}
         <span class="pill pill-mode" title="Start with `sudo stigstiggly serve` to run scans from the dashboard">read-only</span>
       {% endif %}
-      {% if repo_info.version_label %}
-        <span class="meta-item" title="{{ repo_info.path }}">{{ repo_info.version_label }}</span>
-      {% endif %}
-      {% if repo_info.matches_host %}
-        <span class="pill pill-ok" title="Guidance targets macOS {{ repo_info.os_version }}; host is {{ repo_info.host_os }}">macOS {{ repo_info.host_os }} ✓</span>
+      {% if repo_info %}
+        {% if repo_info.version_label %}
+          <span class="meta-item" title="{{ repo_info.path }}">{{ repo_info.version_label }}</span>
+        {% endif %}
+        {% if repo_info.matches_host %}
+          <span class="pill pill-ok" title="Guidance targets macOS {{ repo_info.os_version }}; host is {{ repo_info.host_os }}">macOS {{ repo_info.host_os }} ✓</span>
+        {% endif %}
+      {% else %}
+        <a class="pill pill-mode" href="{{ url_for('setup_view') }}">setup required</a>
       {% endif %}
     </div>
   </header>
-  {% if repo_info.matches_host == false %}
+  {% if repo_info and repo_info.matches_host == false %}
   <div class="banner banner-warn">
     Guidance version mismatch: the repo at {{ repo_info.path }} targets macOS
     {{ repo_info.os_version }}, but this host runs macOS {{ repo_info.host_os }}.
@@ -39,7 +43,8 @@
     {% block content %}{% endblock %}
   </main>
   <footer class="footer">
-    StigStiggly v{{ app_version }} &middot; results from {{ cfg.prefs_dir }} &middot; guidance from {{ repo_info.path }}
+    StigStiggly v{{ app_version }} &middot; results from {{ cfg.prefs_dir }} &middot;
+    guidance from {{ repo_info.path if repo_info else "(not configured — see /setup)" }}
   </footer>
   {% block scripts %}{% endblock %}
 </body>
