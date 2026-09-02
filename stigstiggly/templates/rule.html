@@ -21,6 +21,24 @@
   {% endif %}
 </div>
 
+{% include "activity.html" %}
+
+{% if can_act and rule.status == 'fail' and not rulefix_blocked %}
+<dialog class="modal" id="rulefix-modal" data-url="{{ url_for('start_rule_fix', name=baseline.name, rule_id=rule.id) }}">
+  <h2>Remediate {{ rule.id }}</h2>
+  <p>This runs the rule's mSCP fix commands <strong>as root</strong>, then re-runs the rule's
+    own check to verify. The audit results update only if verification passes; other rules
+    are not touched.</p>
+  {% for kind, chunk in fix_parts %}
+    {% if kind == 'code' %}<pre class="code"><code>{{ chunk }}</code></pre>{% endif %}
+  {% endfor %}
+  <div class="modal-actions">
+    <button class="btn" id="rulefix-cancel">Cancel</button>
+    <button class="btn btn-danger" id="rulefix-confirm">Remediate</button>
+  </div>
+</dialog>
+{% endif %}
+
 {% if not rule.meta %}
 <div class="card"><p class="stale">No metadata found for this rule in {{ repo_info.path }}/rules &mdash; the repo may be on a
 different branch than the one used to build the compliance script.</p></div>
@@ -48,7 +66,17 @@ different branch than the one used to build the compliance script.</p></div>
     {% if kind == 'code' %}<pre class="code"><code>{{ chunk }}</code></pre>
     {% else %}<p class="prose muted">{{ chunk }}</p>{% endif %}
   {% endfor %}
-  <p class="muted small">Fix commands are shown for reference; this dashboard is read-only in Phase 1.</p>
+  {% if rule.status == 'fail' %}
+    {% if can_act and not rulefix_blocked %}
+    <div class="card-actions">
+      <button class="btn btn-danger" id="rulefix-open">Remediate this rule</button>
+    </div>
+    {% elif can_act %}
+    <p class="muted small">Per-rule remediation unavailable: {{ rulefix_blocked }}.</p>
+    {% else %}
+    <p class="muted small">Start the server with <code>sudo stigstiggly serve</code> to remediate this rule from here.</p>
+    {% endif %}
+  {% endif %}
 </section>
 {% elif rule.meta.mobileconfig %}
 <section class="card">

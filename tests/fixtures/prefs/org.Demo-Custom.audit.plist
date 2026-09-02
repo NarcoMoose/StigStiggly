@@ -12,6 +12,21 @@
 		<key>finding</key>
 		<false/>
 	</dict>
+	<key>demo_broken_fix_rule</key>
+	<dict>
+		<key>finding</key>
+		<true/>
+	</dict>
+	<key>demo_context_var_rule</key>
+	<dict>
+		<key>finding</key>
+		<true/>
+	</dict>
+	<key>demo_echo_rule</key>
+	<dict>
+		<key>finding</key>
+		<true/>
+	</dict>
 	<key>icloud_addressbook_disable</key>
 	<dict>
 		<key>exempt</key>

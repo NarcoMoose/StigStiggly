@@ -35,8 +35,14 @@ compliance script in `tests/fixtures/build/`:
 .venv/bin/stigstiggly serve --port 8378 \
   --prefs-dir tests/fixtures/prefs \
   --build-dir tests/fixtures/build \
+  --repo tests/fixtures/repo \
+  --history-dir /tmp/stig-history-test \
   --dev-allow-actions
 ```
+
+(`tests/fixtures/repo/` is a synthetic guidance repo whose demo rules use
+echo-based checks/fixes, so even per-rule remediation is harmless there. Omit
+`--repo` to test display against the real macos_security metadata instead.)
 
 ## Verify
 
@@ -67,6 +73,16 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
 - Remediation UX: confirmation modal lists the exact failed non-exempt rules and
   the command; after a fix job succeeds the client automatically chains a fresh
   `--check` scan so displayed results reflect post-fix state.
+- Per-rule remediation (`POST /baseline/<name>/rule/<id>/fix`): builds a
+  self-deleting zsh script from the rule's own ODV-resolved YAML fix/check
+  (commands stay verbatim NIST content; only orchestration is ours): apply fix,
+  re-run the rule's check, update the audit plist (`finding=false`) only if the
+  check returns the expected value (exit 3 otherwise, plist untouched). Refused
+  for rules without shell fixes, without automatable checks, or whose fix needs
+  compliance-script context vars ($CURRENT_USER — see `SCRIPT_CONTEXT_VARS`).
+  Only rules in status `fail` qualify (pass/exempt/not_scanned are 400s). No
+  follow-up scan is chained; the page just reloads. Tested via the synthetic
+  repo in `tests/fixtures/repo/` (echo-based rules; never touches real state).
 - Security posture: binds 127.0.0.1 only, Host-header allowlist (DNS-rebinding
   defense), per-run CSRF token required on every POST, `--debug` refused as root.
 - Compliance % formula mirrors the mSCP compliance script: (pass + exempt) / scanned.

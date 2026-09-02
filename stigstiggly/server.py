@@ -12,7 +12,14 @@ from datetime import datetime, timezone
 from flask import Flask, Response, abort, jsonify, render_template, request
 
 from . import __version__
-from .actions import JobInProgress, JobManager, find_compliance_script, set_exemption
+from .actions import (
+    JobInProgress,
+    JobManager,
+    build_rule_fix_script,
+    find_compliance_script,
+    rule_fix_blocked_reason,
+    set_exemption,
+)
 from .history import diff_snapshots, load_history, record_snapshot
 from .config import AppConfig
 from .mscp_data import (
@@ -218,7 +225,19 @@ def create_app(cfg: AppConfig) -> Flask:
         if rule is None:
             abort(404, f"Rule '{rule_id}' not found in baseline '{name}'")
         fix_parts = split_fix(rule.fix) if rule.fix else []
-        return render_template("rule.html", baseline=baseline, rule=rule, fix_parts=fix_parts)
+        fix_code = "\n".join(chunk for kind, chunk in fix_parts if kind == "code")
+        rulefix_blocked = (
+            rule_fix_blocked_reason(fix_code, rule.check, rule.result_value)
+            if rule.status == "fail"
+            else None
+        )
+        return render_template(
+            "rule.html",
+            baseline=baseline,
+            rule=rule,
+            fix_parts=fix_parts,
+            rulefix_blocked=rulefix_blocked,
+        )
 
     # -- action API ----------------------------------------------------------
 
@@ -244,6 +263,28 @@ def create_app(cfg: AppConfig) -> Flask:
     @app.route("/baseline/<name>/fix", methods=["POST"])
     def start_fix(name: str):
         return start_script_job(name, "fix", "--fix")
+
+    @app.route("/baseline/<name>/rule/<rule_id>/fix", methods=["POST"])
+    def start_rule_fix(name: str, rule_id: str):
+        if not cfg.can_act:
+            return jsonify(error="remediation requires root; restart with: sudo stigstiggly serve"), 403
+        baseline = get_baseline(name)
+        rule = next((r for r in baseline.rules if r.id == rule_id), None)
+        if rule is None:
+            return jsonify(error=f"rule '{rule_id}' not found in baseline '{name}'"), 404
+        if rule.status != "fail":
+            return jsonify(error=f"rule is '{rule.status}', not a failed rule — nothing to remediate"), 400
+        fix_code = "\n".join(chunk for kind, chunk in split_fix(rule.fix) if kind == "code")
+        blocked = rule_fix_blocked_reason(fix_code, rule.check, rule.result_value)
+        if blocked:
+            return jsonify(error=blocked), 400
+        script = build_rule_fix_script(rule.id, fix_code, rule.check, rule.result_value, baseline.plist_path)
+        try:
+            job = jobs.start(name, "rulefix", ["/bin/zsh", str(script)])
+        except JobInProgress as exc:
+            script.unlink(missing_ok=True)
+            return jsonify(error=str(exc)), 409
+        return jsonify(job=job.to_dict()), 202
 
     @app.route("/baseline/<name>/rule/<rule_id>/exempt", methods=["POST"])
     def set_rule_exemption(name: str, rule_id: str):

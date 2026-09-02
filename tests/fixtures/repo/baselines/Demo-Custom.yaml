@@ -1,0 +1,11 @@
+title: "StigStiggly Demo Baseline (test fixture)"
+description: |
+  Synthetic baseline used to exercise the per-rule remediation pipeline
+  without touching real system state.
+parent_values: "recommended"
+profile:
+  - section: "demo"
+    rules:
+      - demo_echo_rule
+      - demo_broken_fix_rule
+      - demo_context_var_rule

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import tempfile
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -22,6 +23,9 @@ from pathlib import Path
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 SSE_PING_SECONDS = 15
+# Variables defined by the mSCP compliance script that raw fix blocks may
+# reference; single-rule execution can't provide their semantics safely.
+SCRIPT_CONTEXT_VARS = re.compile(r"\$\{?(CURRENT_USER|CURR_USER)")
 
 
 class JobInProgress(Exception):
@@ -142,6 +146,56 @@ def find_compliance_script(build_dir: Path, baseline_name: str) -> Path | None:
         return exact
     hits = sorted(folder.glob("*_compliance.sh"))
     return hits[0] if hits else None
+
+
+def rule_fix_blocked_reason(fix_code: str, check_code: str, expected: str) -> str | None:
+    """Why a rule can't be remediated individually, or None if it can."""
+    if not fix_code.strip():
+        return "rule has no shell fix commands (it may be enforced via configuration profile)"
+    if not check_code.strip() or not expected:
+        return "rule has no automatable check/expected result to verify the fix against"
+    if SCRIPT_CONTEXT_VARS.search(fix_code):
+        return "fix depends on compliance-script context (current-user variables); use full remediation"
+    return None
+
+
+def _sq(value: str) -> str:
+    """Single-quote a string for zsh."""
+    return "'" + value.replace("'", "'\\''") + "'"
+
+
+def build_rule_fix_script(
+    rule_id: str, fix_code: str, check_code: str, expected: str, plist_path: Path
+) -> Path:
+    """Write a self-deleting zsh script: apply the rule's fix (verbatim mSCP
+    commands), re-run the rule's own check, and update the audit plist only
+    if the check now returns the expected value. Returns the script path."""
+    script = f"""#!/bin/zsh
+trap '/bin/rm -f -- "$0"' EXIT
+echo "Applying fix for: {rule_id}"
+{fix_code}
+echo "Verifying with the rule's check..."
+result_value=$(
+{check_code}
+)
+expected={_sq(expected)}
+if [[ "$result_value" == "$expected" ]]; then
+    echo "Verified: check returns expected value ($expected)"
+    /usr/bin/defaults write {_sq(str(plist_path))} {_sq(rule_id)} -dict-add finding -bool false
+    echo "Audit results updated: {rule_id} now compliant"
+else
+    echo "VERIFICATION FAILED: check returned '$result_value', expected '$expected'"
+    echo "Audit results left unchanged; a restart or logout may be required, or the fix did not apply."
+    exit 3
+fi
+"""
+    with tempfile.NamedTemporaryFile(
+        "w", prefix=f"stigstiggly-rulefix-{rule_id}-", suffix=".zsh", delete=False
+    ) as fp:
+        fp.write(script)
+        path = Path(fp.name)
+    path.chmod(0o700)
+    return path
 
 
 def set_exemption(plist_path: Path, rule_id: str, exempt: bool, reason: str | None) -> None:

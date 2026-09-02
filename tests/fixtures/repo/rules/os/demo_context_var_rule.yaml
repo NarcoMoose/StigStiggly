@@ -1,0 +1,18 @@
+id: demo_context_var_rule
+title: Demo Rule Requiring Compliance-Script Context
+discussion: |
+  Test-fixture rule. The fix references $CURRENT_USER, which only the full
+  compliance script defines, so per-rule remediation must refuse it.
+check: |
+  /bin/echo 0
+result:
+  integer: 1
+fix: |
+  [source,bash]
+  ----
+  /bin/launchctl asuser $(/usr/bin/id -u $CURRENT_USER) /usr/bin/defaults write demo_pref demo_key -bool true
+  ----
+severity: low
+tags:
+  - demo
+mobileconfig: false

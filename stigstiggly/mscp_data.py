@@ -53,6 +53,7 @@ class RuleMeta:
     check: str
     fix: str
     result_expected: str
+    result_raw: str  # bare expected value for verification (e.g. "1"), pre-ODV
     severity: str | None
     references: dict[str, list[str]]
     tags: list[str]
@@ -79,6 +80,7 @@ class RuleStatus:
     check: str = ""  # ODV-resolved copies for display
     fix: str = ""
     result_expected: str = ""
+    result_value: str = ""  # ODV-resolved bare expected value, for verification
 
     @property
     def title(self) -> str:
@@ -183,8 +185,12 @@ def _parse_rule_file(path: Path) -> RuleMeta | None:
         if isinstance(vals, list)
     }
     result = data.get("result")
+    result_raw = ""
     if isinstance(result, dict):
         result_expected = ", ".join(f"{k}: {v}" for k, v in result.items())
+        if result:
+            first = next(iter(result.values()))
+            result_raw = ("1" if first else "0") if isinstance(first, bool) else str(first)
     else:
         result_expected = str(result) if result else ""
     return RuleMeta(
@@ -194,6 +200,7 @@ def _parse_rule_file(path: Path) -> RuleMeta | None:
         check=(data.get("check") or "").strip(),
         fix=(data.get("fix") or "").strip(),
         result_expected=result_expected,
+        result_raw=result_raw,
         severity=data.get("severity"),
         references=refs,
         tags=[str(t) for t in data.get("tags") or []],
@@ -300,6 +307,7 @@ def _build_rule_status(
         rs.check = resolve_odv(meta.check, meta.odv, parent_values)
         rs.fix = resolve_odv(meta.fix, meta.odv, parent_values)
         rs.result_expected = resolve_odv(meta.result_expected, meta.odv, parent_values)
+        rs.result_value = resolve_odv(meta.result_raw, meta.odv, parent_values)
     return rs
 
 

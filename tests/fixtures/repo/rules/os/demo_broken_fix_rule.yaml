@@ -1,0 +1,18 @@
+id: demo_broken_fix_rule
+title: Demo Rule Whose Fix Does Not Take Effect
+discussion: |
+  Test-fixture rule. The fix is a no-op, so verification must fail and the
+  audit plist must remain unchanged.
+check: |
+  /bin/echo 0
+result:
+  integer: 1
+fix: |
+  [source,bash]
+  ----
+  /usr/bin/true
+  ----
+severity: medium
+tags:
+  - demo
+mobileconfig: false

@@ -1,0 +1,18 @@
+id: demo_echo_rule
+title: Demo Rule With Working Fix
+discussion: |
+  Test-fixture rule. The fix writes a marker file; the check reads it back.
+  Exercises the per-rule fix + verify + plist-update pipeline harmlessly.
+check: |
+  /bin/cat /tmp/stigstiggly-demo-state 2>/dev/null || /bin/echo 0
+result:
+  integer: 1
+fix: |
+  [source,bash]
+  ----
+  /bin/echo 1 > /tmp/stigstiggly-demo-state
+  ----
+severity: low
+tags:
+  - demo
+mobileconfig: false

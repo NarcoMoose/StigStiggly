@@ -20,7 +20,7 @@
     const logEl = document.getElementById("activity-log");
     const statusEl = document.getElementById("activity-status");
     const cmdEl = document.getElementById("activity-cmd");
-    const actionButtons = Array.from(document.querySelectorAll(".scan-btn, #fix-open"));
+    const actionButtons = Array.from(document.querySelectorAll(".scan-btn, #fix-open, #rulefix-open"));
     let source = null;
 
     const setButtons = (disabled) =>
@@ -36,7 +36,7 @@
     function attach(job, from) {
       panel.hidden = false;
       cmdEl.textContent = job.command;
-      setStatus(job.kind === "fix" ? "remediating" : "scanning", "badge-running");
+      setStatus(job.kind.includes("fix") ? "remediating" : "scanning", "badge-running");
       setButtons(true);
       if (source) source.close();
       source = new EventSource("/job/" + job.id + "/stream?from=" + (from || 0));
@@ -87,7 +87,22 @@
       })
     );
 
-    // Remediation goes through the confirmation modal.
+    // Single-rule remediation (rule page) goes through its own modal.
+    const rulefixModal = document.getElementById("rulefix-modal");
+    const rulefixOpen = document.getElementById("rulefix-open");
+    if (rulefixModal && rulefixOpen) {
+      rulefixOpen.addEventListener("click", () => rulefixModal.showModal());
+      document.getElementById("rulefix-cancel").addEventListener("click", () => rulefixModal.close());
+      document.getElementById("rulefix-confirm").addEventListener("click", () => {
+        rulefixModal.close();
+        logEl.textContent = "";
+        post(rulefixModal.dataset.url)
+          .then((data) => attach(data.job, 0))
+          .catch((err) => alert("Could not start remediation: " + err.message));
+      });
+    }
+
+    // Full-baseline remediation goes through the confirmation modal.
     const modal = document.getElementById("fix-modal");
     const fixOpen = document.getElementById("fix-open");
     if (modal && fixOpen) {
