@@ -144,7 +144,21 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
   `xlwt` dep; titles must contain a colon — builder auto-prefixes "macOS <ver>:").
   Docs: the generator bundler-installs asciidoctor into `<repo>/bin` +
   `<repo>/mscp_gems` on first run if missing. Bundle download zips
-  `<repo>/build/<name>/` + BUILD_INFO.txt. Builder works unprivileged (writes
-  only into the guidance repo, never system state). Custom baselines are
-  auto-usable locally: build output lands in the standard build dir, so scan
-  actions pick them up once the generated script is run with --check.
+  `<repo>/build/<name>/` + the baseline YAML (under `<name>/baseline/`) +
+  BUILD_INFO.txt. Builder works unprivileged (writes only into the guidance
+  repo, never system state). Custom baselines are auto-usable locally via
+  build-dir discovery.
+- Bundle import (`POST /baselines/import`, dropzone on /builder): validates the
+  zip defensively (single top-level dir matching the baseline name regex, no
+  traversal/absolute paths, size+member caps, compliance script required,
+  stock-name collisions rejected), installs artifacts to `build_dir/<name>/`
+  and the baseline YAML to `custom/baselines/`. Baseline YAML lookup checks
+  `custom/baselines/` before `baselines/` (builder-created baselines display
+  sections — this was a bug fixed in 0.3.0).
+- Remove/hide (`POST /baseline/<name>/remove`, `.../unhide`): deletes builder
+  artifacts (build dir + custom baseline YAML) and adds the name to
+  `~/.local/share/stigstiggly/hidden_baselines.json`, which discovery filters.
+  Scan results/logs/exemptions are never deleted; hidden baselines with
+  surviving scan results are restorable from the Builder page. Re-importing a
+  bundle auto-unhides. The device report intentionally ignores the hidden list
+  (it reports disk truth, not UI state).

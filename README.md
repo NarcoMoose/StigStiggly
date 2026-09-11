@@ -28,6 +28,11 @@ custom baselines, and export reports — all from your browser, all on-device.
   800-53, CMMC, ...), add/remove rules, edit organization-defined values, and
   generate a distributable bundle (compliance script, configuration profiles,
   docs) via mSCP's own `generate_guidance.py`.
+- **Bundle import & baseline management** — drag a bundle zip onto another
+  machine's Builder page (or browse for it) and the baseline lands on that
+  dashboard scan-ready, sections and all. Baselines can be removed from the
+  dashboard/builder at any time — builder artifacts are deleted, but scan
+  results, logs, and exemptions are always preserved (and restorable).
 - **Device reports** — versioned JSON (`stigstiggly report` or
   `GET /report.json`) with host identity and per-baseline state, ready for
   fleet collection.

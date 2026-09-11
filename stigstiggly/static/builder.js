@@ -1,9 +1,91 @@
-// Baseline builder: rule filtering, selection management, create+generate submit.
+// Baseline builder: bundle import, remove/restore, rule filtering, create+generate.
 (function () {
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+  // ---- bundle import (builder index) --------------------------------------
+  const drop = document.getElementById("import-drop");
+  if (drop) {
+    const fileInput = document.getElementById("import-file");
+    const status = document.getElementById("import-status");
+
+    async function upload(file) {
+      if (!file) return;
+      status.textContent = "Importing " + file.name + "…";
+      const form = new FormData();
+      form.append("bundle", file);
+      try {
+        const resp = await fetch("/baselines/import", {
+          method: "POST",
+          headers: { "X-CSRF-Token": csrf },
+          body: form,
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || resp.statusText);
+        status.textContent = "Imported " + data.name + " — opening dashboard…";
+        setTimeout(() => (window.location = "/baseline/" + encodeURIComponent(data.name)), 700);
+      } catch (err) {
+        status.textContent = "Import failed: " + err.message;
+      }
+    }
+
+    document.getElementById("import-browse").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => upload(fileInput.files[0]));
+    ["dragover", "dragenter"].forEach((evt) =>
+      drop.addEventListener(evt, (e) => {
+        e.preventDefault();
+        drop.classList.add("drag");
+      })
+    );
+    ["dragleave", "drop"].forEach((evt) =>
+      drop.addEventListener(evt, (e) => {
+        e.preventDefault();
+        drop.classList.remove("drag");
+      })
+    );
+    drop.addEventListener("drop", (e) => upload(e.dataTransfer.files[0]));
+  }
+
+  // ---- remove / restore (builder index) ------------------------------------
+  const removeModal = document.getElementById("remove-modal");
+  if (removeModal) {
+    let target = null;
+    document.querySelectorAll(".remove-btn").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        target = btn.dataset.baseline;
+        document.getElementById("remove-name").textContent = target;
+        removeModal.showModal();
+      })
+    );
+    document.getElementById("remove-cancel").addEventListener("click", () => removeModal.close());
+    document.getElementById("remove-confirm").addEventListener("click", async () => {
+      removeModal.close();
+      try {
+        const resp = await fetch("/baseline/" + encodeURIComponent(target) + "/remove", {
+          method: "POST",
+          headers: { "X-CSRF-Token": csrf },
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || resp.statusText);
+        location.reload();
+      } catch (err) {
+        alert("Remove failed: " + err.message);
+      }
+    });
+  }
+  document.querySelectorAll(".unhide-link").forEach((link) =>
+    link.addEventListener("click", async (e) => {
+      e.preventDefault();
+      await fetch("/baseline/" + encodeURIComponent(link.dataset.baseline) + "/unhide", {
+        method: "POST",
+        headers: { "X-CSRF-Token": csrf },
+      });
+      location.reload();
+    })
+  );
+
+  // ---- rule picker (builder/new page) --------------------------------------
   const rules = Array.from(document.querySelectorAll(".brule"));
   if (!rules.length) return;
-
-  const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const search = document.getElementById("rule-filter");
   const sevGroup = document.getElementById("sev-filter");
   const tagSelect = document.getElementById("tag-filter");

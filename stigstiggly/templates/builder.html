@@ -8,6 +8,18 @@ mSCP's own generator.</p>
 
 {% include "activity.html" %}
 
+<div class="card" id="import-card">
+  <h2 class="card-heading">Import a bundle</h2>
+  <div class="dropzone" id="import-drop">
+    <p>Drag a StigStiggly bundle zip here, or
+      <button class="btn btn-small" id="import-browse">browse…</button></p>
+    <p class="muted small">Installs the compliance script and baseline definition so the
+      baseline appears on the dashboard, scan-ready. Nothing runs until you run it.</p>
+    <input type="file" id="import-file" accept=".zip" hidden>
+    <span class="muted small" id="import-status"></span>
+  </div>
+</div>
+
 <div class="card">
   <h2 class="card-heading">Start from a template</h2>
   <div class="template-grid">
@@ -43,6 +55,7 @@ mSCP's own generator.</p>
           <a class="btn btn-small" href="{{ url_for('builder_bundle', name=c.template.name) }}">Download bundle</a>
           {% endif %}
           <a class="btn btn-small" href="{{ url_for('builder_new', template=c.template.name) }}">Edit &amp; regenerate</a>
+          <button class="btn btn-small btn-danger remove-btn" data-baseline="{{ c.template.name }}">Remove</button>
         </td>
       </tr>
       {% endfor %}
@@ -50,5 +63,34 @@ mSCP's own generator.</p>
   </table>
   {% endif %}
 </div>
+
+{% if hidden %}
+<div class="card">
+  <h2 class="card-heading">Hidden from dashboard</h2>
+  <p class="muted small">Removed baselines whose scan results still exist on disk.
+    Restoring brings the card back without re-importing.</p>
+  <div class="tag-list">
+    {% for name in hidden %}
+    <span class="pill">{{ name }} <a href="#" class="unhide-link" data-baseline="{{ name }}">restore</a></span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<dialog class="modal" id="remove-modal">
+  <h2>Remove <span id="remove-name" class="mono"></span></h2>
+  <p>This deletes the generated build artifacts and the custom baseline definition,
+    and hides the baseline from the dashboard.</p>
+  <p class="muted small">Scan results, logs, exemptions, and anything you exported are
+    <strong>not</strong> touched — if scan results exist, the baseline appears under
+    "Hidden from dashboard" and can be restored.</p>
+  <div class="modal-actions">
+    <button class="btn" id="remove-cancel">Cancel</button>
+    <button class="btn btn-danger" id="remove-confirm">Remove</button>
+  </div>
+</dialog>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='activity.js') }}"></script>{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='activity.js') }}"></script>
+<script src="{{ url_for('static', filename='builder.js') }}"></script>
+{% endblock %}

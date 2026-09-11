@@ -31,12 +31,20 @@ from .builder import (
     create_custom_baseline,
     find_template,
     generation_command,
+    import_bundle,
     list_templates,
+    remove_baseline,
 )
 from .history import diff_snapshots, load_history, record_snapshot
 from .report import build_report
 from .updates import cached_updates, refresh_async
-from .config import AppConfig, managed_content_dir, save_config_file
+from .config import (
+    AppConfig,
+    load_hidden_baselines,
+    managed_content_dir,
+    save_config_file,
+    save_hidden_baselines,
+)
 from .mscp_data import (
     REFERENCE_LABELS,
     Baseline,
@@ -198,8 +206,16 @@ def create_app(cfg: AppConfig) -> Flask:
             "build_dir_display": str(bdir) if bdir else "(unset)",
         }
 
+    def visible_baselines() -> list[Baseline]:
+        hidden = load_hidden_baselines()
+        return [
+            b
+            for b in discover_baselines(cfg.prefs_dir, repo(), build_dir())
+            if b.name not in hidden
+        ]
+
     def get_baseline(name: str) -> Baseline:
-        for b in discover_baselines(cfg.prefs_dir, repo(), build_dir()):
+        for b in visible_baselines():
             if b.name == name:
                 return b
         abort(404, f"No audit results found for baseline '{name}'")
@@ -216,7 +232,7 @@ def create_app(cfg: AppConfig) -> Flask:
     def overview():
         if (r := setup_redirect()) is not None:
             return r
-        baselines = discover_baselines(cfg.prefs_dir, repo(), build_dir())
+        baselines = visible_baselines()
         snapshot(*baselines)
         return render_template(
             "overview.html",
@@ -376,6 +392,7 @@ def create_app(cfg: AppConfig) -> Flask:
             "builder.html",
             templates=[t for t in templates if not t.custom],
             customs=customs,
+            hidden=sorted(load_hidden_baselines()),
         )
 
     @app.route("/builder/new")
@@ -419,6 +436,48 @@ def create_app(cfg: AppConfig) -> Flask:
         except JobInProgress as exc:
             return jsonify(error=str(exc)), 409
         return jsonify(job=job.to_dict()), 202
+
+    @app.route("/baselines/import", methods=["POST"])
+    def baselines_import():
+        if (err := setup_error()) is not None:
+            return err
+        upload = request.files.get("bundle")
+        if upload is None or not upload.filename:
+            return jsonify(error="no bundle file provided"), 400
+        try:
+            name = import_bundle(repo(), build_dir(), upload.read())
+        except BuilderError as exc:
+            return jsonify(error=str(exc)), 400
+        except OSError as exc:
+            return jsonify(error=f"could not install bundle: {exc}"), 500
+        hidden = load_hidden_baselines()
+        if name in hidden:  # re-importing something previously removed unhides it
+            hidden.discard(name)
+            save_hidden_baselines(hidden)
+        return jsonify(ok=True, name=name)
+
+    @app.route("/baseline/<name>/remove", methods=["POST"])
+    def baseline_remove(name: str):
+        if (err := setup_error()) is not None:
+            return err
+        template = find_template(repo(), name)
+        removed = []
+        if template and template.custom or built_artifacts(repo(), name):
+            removed = remove_baseline(repo(), build_dir(), name)
+        hidden = load_hidden_baselines()
+        hidden.add(name)
+        try:
+            save_hidden_baselines(hidden)
+        except OSError as exc:
+            return jsonify(error=f"could not update hidden list: {exc}"), 500
+        return jsonify(ok=True, removed=removed, hidden=name)
+
+    @app.route("/baseline/<name>/unhide", methods=["POST"])
+    def baseline_unhide(name: str):
+        hidden = load_hidden_baselines()
+        hidden.discard(name)
+        save_hidden_baselines(hidden)
+        return jsonify(ok=True)
 
     @app.route("/builder/bundle/<name>.zip")
     def builder_bundle(name: str):

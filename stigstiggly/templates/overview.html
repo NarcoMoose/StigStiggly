@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}StigStiggly &middot; Overview{% endblock %}
 {% block content %}
-<h1 class="page-title">Baselines</h1>
+<div class="page-head">
+  <h1 class="page-title">Baselines</h1>
+  <a class="btn" href="{{ url_for('builder_index') }}#import-card" title="Import a bundle or build a new baseline">Add baseline</a>
+</div>
 {% if not baselines %}
   <div class="empty-state">
     <p>No mSCP audit results found in <code>{{ cfg.prefs_dir }}</code>.</p>

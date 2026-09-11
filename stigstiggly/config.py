@@ -129,6 +129,29 @@ def default_history_dir() -> Path:
     return data_dir() / "history"
 
 
+def hidden_baselines_file() -> Path:
+    return data_dir() / "hidden_baselines.json"
+
+
+def load_hidden_baselines() -> set[str]:
+    import json
+
+    try:
+        data = json.loads(hidden_baselines_file().read_text(encoding="utf-8"))
+        return {str(n) for n in data} if isinstance(data, list) else set()
+    except (OSError, ValueError):
+        return set()
+
+
+def save_hidden_baselines(names: set[str]) -> None:
+    import json
+
+    path = hidden_baselines_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted(names)), encoding="utf-8")
+    chown_to_invoker(path)
+
+
 @dataclass(frozen=True)
 class AppConfig:
     repo: Path | None  # None = setup mode: server guides the user to bootstrap

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
 import sys
 import zipfile
 from dataclasses import dataclass
@@ -255,22 +256,124 @@ def built_artifacts(repo: Path, name: str) -> dict | None:
 
 
 def bundle_zip(repo: Path, name: str, guidance_label: str | None) -> bytes:
-    """Zip the generated build directory plus a build-info manifest."""
+    """Zip the generated build directory plus the baseline YAML and a manifest.
+
+    The baseline YAML (under <name>/baseline/) lets another StigStiggly
+    instance import the bundle with full section/rule metadata support."""
     build = repo / "build" / name
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(build.rglob("*")):
             if path.is_file() and not path.name.startswith("._"):
                 zf.write(path, f"{name}/{path.relative_to(build)}")
+        for folder in ("custom/baselines", "baselines"):
+            baseline_yaml = repo / folder / f"{name}.yaml"
+            if baseline_yaml.is_file():
+                zf.write(baseline_yaml, f"{name}/baseline/{name}.yaml")
+                break
         info = (
             f"Baseline: {name}\n"
             f"Generated: {datetime.now(timezone.utc).isoformat(timespec='seconds')}\n"
             f"Guidance: {guidance_label or 'unknown'}\n"
             f"Created with StigStiggly + mSCP generate_guidance.py\n\n"
             f"Apply on a target machine:\n"
-            f"  sudo zsh {name}/{name}_compliance.sh --check   # scan\n"
-            f"  sudo zsh {name}/{name}_compliance.sh --fix     # remediate failed rules\n"
+            f"  Preferred: import this zip in StigStiggly (Builder -> Import a bundle),\n"
+            f"  then use Run scan / Remediate from the dashboard.\n\n"
+            f"  Manual alternative:\n"
+            f"    sudo zsh {name}/{name}_compliance.sh --check   # scan\n"
+            f"    sudo zsh {name}/{name}_compliance.sh --fix     # remediate failed rules\n"
             f"Install configuration profiles from {name}/mobileconfigs/ via MDM or manually.\n"
         )
         zf.writestr(f"{name}/BUILD_INFO.txt", info)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Bundle import + dashboard add/remove
+# ---------------------------------------------------------------------------
+
+MAX_BUNDLE_MEMBERS = 2000
+MAX_BUNDLE_UNCOMPRESSED = 300 * 1024 * 1024  # generous: PDFs can be chunky
+
+
+def import_bundle(repo: Path, build_dir: Path, payload: bytes) -> str:
+    """Install a StigStiggly bundle zip. Returns the baseline name.
+
+    Validates structure defensively (single top-level dir named like a
+    baseline, no traversal, must contain the compliance script) and installs
+    the build artifacts to <build_dir>/<name>/ plus the baseline YAML to
+    <repo>/custom/baselines/ when the bundle carries one.
+    """
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(payload))
+    except zipfile.BadZipFile as exc:
+        raise BuilderError(f"not a valid zip file: {exc}") from exc
+    members = [m for m in zf.infolist() if not m.is_dir()]
+    if not members:
+        raise BuilderError("bundle is empty")
+    if len(members) > MAX_BUNDLE_MEMBERS:
+        raise BuilderError("bundle has too many files")
+    if sum(m.file_size for m in members) > MAX_BUNDLE_UNCOMPRESSED:
+        raise BuilderError("bundle is too large")
+
+    roots = set()
+    for m in members:
+        parts = m.filename.split("/")
+        if m.filename.startswith("/") or ".." in parts or not parts[0]:
+            raise BuilderError(f"unsafe path in bundle: {m.filename}")
+        if len(parts) < 2:
+            raise BuilderError(f"unexpected top-level file in bundle: {m.filename}")
+        roots.add(parts[0])
+    if len(roots) != 1:
+        raise BuilderError("bundle must contain exactly one baseline directory")
+    name = roots.pop()
+    if not BASELINE_NAME_RE.match(name):
+        raise BuilderError(f"invalid baseline name in bundle: '{name}'")
+    stock_names = {t.name for t in list_templates(repo) if not t.custom}
+    if name in stock_names:
+        raise BuilderError(f"'{name}' collides with a stock mSCP baseline name")
+    script_member = f"{name}/{name}_compliance.sh"
+    if script_member not in {m.filename for m in members}:
+        raise BuilderError(f"bundle has no compliance script ({script_member})")
+
+    dest = build_dir / name
+    if dest.exists():
+        shutil.rmtree(dest)
+    baseline_yaml_member = f"{name}/baseline/{name}.yaml"
+    for m in members:
+        rel = Path(*m.filename.split("/")[1:])
+        if m.filename == baseline_yaml_member:
+            continue  # installed to custom/baselines below, not into build/
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(zf.read(m))
+        chown_to_invoker(target)
+    (dest / f"{name}_compliance.sh").chmod(0o755)
+    for parent in {dest, *[p.parent for p in dest.rglob("*")]}:
+        chown_to_invoker(parent)
+
+    if baseline_yaml_member in {m.filename for m in members}:
+        baselines_dir = repo / "custom" / "baselines"
+        baselines_dir.mkdir(parents=True, exist_ok=True)
+        chown_to_invoker(baselines_dir.parent)
+        chown_to_invoker(baselines_dir)
+        yaml_path = baselines_dir / f"{name}.yaml"
+        yaml_path.write_bytes(zf.read(baseline_yaml_member))
+        chown_to_invoker(yaml_path)
+    return name
+
+
+def remove_baseline(repo: Path, build_dir: Path, name: str) -> list[str]:
+    """Delete builder artifacts for `name` (generated build dir + custom
+    baseline YAML). Scan results, logs, and exemptions are never touched.
+    Returns a list of removed paths for the UI."""
+    removed = []
+    build = build_dir / name
+    if build.is_dir():
+        shutil.rmtree(build)
+        removed.append(str(build))
+    custom_yaml = repo / "custom" / "baselines" / f"{name}.yaml"
+    if custom_yaml.is_file():
+        custom_yaml.unlink()
+        removed.append(str(custom_yaml))
+    return removed

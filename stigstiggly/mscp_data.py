@@ -243,12 +243,15 @@ def load_sections(repo: Path) -> dict[str, tuple[str, str]]:
 
 
 def _find_baseline_yaml(repo: Path, name: str) -> Path | None:
-    exact = repo / "baselines" / f"{name}.yaml"
-    if exact.is_file():
-        return exact
-    for f in repo.glob("baselines/*.yaml"):  # tolerant fallback
-        if f.stem.lower() == name.lower():
-            return f
+    # custom/ first: builder-created baselines live there and override stock
+    for folder in ("custom/baselines", "baselines"):
+        exact = repo / folder / f"{name}.yaml"
+        if exact.is_file():
+            return exact
+    for folder in ("custom/baselines", "baselines"):  # tolerant fallback
+        for f in repo.glob(f"{folder}/*.yaml"):
+            if f.stem.lower() == name.lower():
+                return f
     return None
 
 

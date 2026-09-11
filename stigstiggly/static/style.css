@@ -291,6 +291,17 @@ a.btn:hover { text-decoration: none; }
 .btn-primary { border-color: #1f4635; color: var(--green); }
 .btn-primary:hover:not(:disabled) { border-color: var(--green); color: var(--green); background: #11301f; }
 
+/* import dropzone + page head */
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.page-head .page-title { margin: 0; }
+.dropzone {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 18px 20px;
+  text-align: center; transition: border-color 0.15s, background 0.15s;
+}
+.dropzone.drag { border-color: var(--blue); background: #14202e; }
+.dropzone p { margin: 4px 0; }
+.remove-here-btn { margin-left: auto; }
+
 /* setup page */
 .doctor-table td { padding: 5px 0; }
 .doctor-table th { padding-right: 18px; }

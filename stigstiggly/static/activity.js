@@ -127,6 +127,20 @@
       .catch(() => {});
   }
 
+  // ---- remove-from-dashboard (baseline page) --------------------------------
+  const removeBtn = document.getElementById("baseline-remove");
+  const removeModal = document.getElementById("remove-modal");
+  if (removeBtn && removeModal) {
+    removeBtn.addEventListener("click", () => removeModal.showModal());
+    document.getElementById("remove-cancel").addEventListener("click", () => removeModal.close());
+    document.getElementById("remove-confirm").addEventListener("click", () => {
+      removeModal.close();
+      post("/baseline/" + encodeURIComponent(removeModal.dataset.baseline) + "/remove")
+        .then(() => (window.location = "/"))
+        .catch((err) => alert("Remove failed: " + err.message));
+    });
+  }
+
   // ---- exemption form (rule page) -----------------------------------------
   const exemptCard = document.getElementById("exempt-card");
   if (exemptCard) {

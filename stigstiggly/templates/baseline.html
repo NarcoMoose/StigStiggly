@@ -44,6 +44,8 @@
           <button class="btn" disabled data-locked="1" title="Start with `sudo stigstiggly serve` to remediate">Remediate</button>
         {% endif %}
         <a class="btn" href="{{ url_for('export_csv', name=baseline.name) }}">Export CSV</a>
+        <button class="btn remove-here-btn" id="baseline-remove" data-baseline="{{ baseline.name }}"
+                title="Hide from dashboard and delete builder artifacts; scan results are preserved">Remove…</button>
       </div>
     </div>
   </div>
@@ -129,6 +131,19 @@
 {% endif %}
 
 {% include "activity.html" %}
+
+<dialog class="modal" id="remove-modal" data-baseline="{{ baseline.name }}">
+  <h2>Remove {{ baseline.name }} from the dashboard</h2>
+  <p>Hides this baseline and deletes builder artifacts (generated build directory and
+    custom baseline definition, when present).</p>
+  <p class="muted small">Scan results, logs, exemptions, and exports are <strong>not</strong>
+    touched. Restore later from the Builder page ("Hidden from dashboard"), or by
+    re-importing a bundle.</p>
+  <div class="modal-actions">
+    <button class="btn" id="remove-cancel">Cancel</button>
+    <button class="btn btn-danger" id="remove-confirm">Remove</button>
+  </div>
+</dialog>
 
 {% if can_act %}
 {% set age = scan_age_days(baseline) %}
