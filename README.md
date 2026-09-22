@@ -27,7 +27,11 @@ custom baselines, and export reports — all from your browser, all on-device.
 - **Baseline builder** — start from any stock baseline (DISA-STIG, CIS L1/L2,
   800-53, CMMC, ...), add/remove rules, edit organization-defined values, and
   generate a distributable bundle (compliance script, configuration profiles,
-  docs) via mSCP's own `generate_guidance.py`.
+  docs) via mSCP's own `generate_guidance.py`. Every rule expands in place to
+  show NIST's explanation of what it does, how it's enforced (script vs.
+  profile), and the exact commands remediation would run — and search matches
+  that text, so you can find rules by concept ("screensaver", "bluetooth")
+  while deciding what to include.
 - **Bundle import & baseline management** — drag a bundle zip onto another
   machine's Builder page (or browse for it) and the baseline lands on that
   dashboard scan-ready, sections and all. Baselines can be removed from the

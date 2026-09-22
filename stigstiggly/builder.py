@@ -27,7 +27,7 @@ from pathlib import Path
 import yaml
 
 from .config import chown_to_invoker
-from .mscp_data import RuleMeta, load_rule_index, _load_yaml
+from .mscp_data import RuleMeta, load_rule_index, resolve_odv, split_fix, _load_yaml
 
 BASELINE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$")
 
@@ -122,6 +122,14 @@ def build_catalog(repo: Path, template: TemplateInfo) -> dict:
         if meta.odv:
             default = _odv_default(meta, parent_values)
             odv = {"hint": str(meta.odv.get("hint", "")), "default": "" if default is None else str(default)}
+        resolve = lambda text: resolve_odv(text, meta.odv, parent_values)
+        fix_blocks = [(kind, resolve(chunk)) for kind, chunk in split_fix(meta.fix)]
+        has_fix_code = any(kind == "code" for kind, _ in fix_blocks)
+        enforcement = (
+            "profile" if meta.mobileconfig
+            else "script" if has_fix_code
+            else "informational"
+        )
         groups.setdefault(_section_key(meta), []).append(
             {
                 "id": meta.id,
@@ -130,6 +138,12 @@ def build_catalog(repo: Path, template: TemplateInfo) -> dict:
                 "tags": meta.tags,
                 "in_template": meta.id in selected,
                 "odv": odv,
+                "discussion": meta.discussion,
+                "check": resolve(meta.check),
+                "expected": resolve(meta.result_expected),
+                "fix_blocks": fix_blocks,
+                "stig_ids": meta.stig_ids,
+                "enforcement": enforcement,
             }
         )
 

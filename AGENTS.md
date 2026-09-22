@@ -148,6 +148,11 @@ curl -s http://127.0.0.1:8377/ | grep -c baseline-card # smoke test while servin
   BUILD_INFO.txt. Builder works unprivileged (writes only into the guidance
   repo, never system state). Custom baselines are auto-usable locally via
   build-dir discovery.
+- Builder rule picker: every row carries an expandable detail block (NIST
+  discussion, enforcement type — script/profile/informational, ODV-resolved
+  check + fix commands, STIG IDs) rendered server-side from the catalog; the
+  picker's search indexes that detail text client-side (builder.js `searchText`
+  map) so queries match rule meaning, not just ids/titles.
 - Bundle import (`POST /baselines/import`, dropzone on /builder): validates the
   zip defensively (single top-level dir matching the baseline name regex, no
   traversal/absolute paths, size+member caps, compliance script required,

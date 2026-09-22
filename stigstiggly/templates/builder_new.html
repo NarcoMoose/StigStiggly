@@ -41,12 +41,18 @@
   {% for r in section.rules %}
   <div class="brule" data-id="{{ r.id }}" data-severity="{{ r.severity }}" data-tags="{{ r.tags | join(' ') }}"
        data-text="{{ (r.id ~ ' ' ~ r.title ~ ' ' ~ (r.tags | join(' '))) | lower }}">
-    <label class="brule-main">
-      <input type="checkbox" class="brule-check" {% if r.in_template %}checked{% endif %}>
-      <span class="mono brule-id">{{ r.id }}</span>
-      <span class="brule-title">{{ r.title }}</span>
-      <span class="sev-label sev-{{ r.severity }}">{{ r.severity }}</span>
-    </label>
+    <div class="brule-row">
+      <label class="brule-main">
+        <input type="checkbox" class="brule-check" {% if r.in_template %}checked{% endif %}>
+        <span class="mono brule-id">{{ r.id }}</span>
+        <span class="brule-title">{{ r.title }}</span>
+        <span class="sev-label sev-{{ r.severity }}">{{ r.severity }}</span>
+        {% if r.enforcement != 'script' %}
+        <span class="pill pill-enf" title="{{ 'Enforced via configuration profile — the compliance script checks but cannot fix it' if r.enforcement == 'profile' else 'Informational — no automated check or fix' }}">{{ r.enforcement }}</span>
+        {% endif %}
+      </label>
+      <button class="brule-toggle" type="button" aria-expanded="false" title="What does this rule do?">&#9656;</button>
+    </div>
     {% if r.odv %}
     <div class="brule-odv">
       <input type="text" class="odv-input" data-rule="{{ r.id }}" value="{{ r.odv.default }}"
@@ -54,6 +60,25 @@
       <span class="muted small odv-hint">{{ r.odv.hint }}</span>
     </div>
     {% endif %}
+    <div class="brule-detail" hidden>
+      {% if r.discussion %}<p class="prose">{{ r.discussion }}</p>{% endif %}
+      <p class="small muted">
+        Enforcement: {% if r.enforcement == 'profile' %}configuration profile (bundle includes it; the script only checks){% elif r.enforcement == 'script' %}compliance script (check + fix below){% else %}informational — nothing is changed on the system{% endif %}
+        {% if r.stig_ids %} &middot; STIG: <span class="mono">{{ r.stig_ids | join(', ') }}</span>{% endif %}
+      </p>
+      {% if r.check %}
+      <h4 class="detail-heading">Check</h4>
+      <pre class="code"><code>{{ r.check }}</code></pre>
+      {% if r.expected %}<p class="muted small">Expected result &mdash; <code>{{ r.expected }}</code></p>{% endif %}
+      {% endif %}
+      {% if r.fix_blocks %}
+      <h4 class="detail-heading">Fix (what enabling this rule runs on remediation)</h4>
+      {% for kind, chunk in r.fix_blocks %}
+        {% if kind == 'code' %}<pre class="code"><code>{{ chunk }}</code></pre>
+        {% else %}<p class="prose muted small">{{ chunk }}</p>{% endif %}
+      {% endfor %}
+      {% endif %}
+    </div>
   </div>
   {% endfor %}
 </div>

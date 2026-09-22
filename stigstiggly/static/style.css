@@ -273,7 +273,25 @@ a.btn:hover { text-decoration: none; }
 .builder-section-head { display: flex; align-items: center; justify-content: space-between; }
 .sec-links a { color: var(--muted); }
 .brule { padding: 5px 0; border-bottom: 1px solid #1b2430; }
-.brule-main { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.brule-row { display: flex; align-items: center; gap: 8px; }
+.brule-main { display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; min-width: 0; }
+.brule-toggle {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 14px; padding: 2px 8px; transition: transform 0.12s; flex: none;
+}
+.brule-toggle:hover { color: var(--blue); }
+.brule-toggle.open { transform: rotate(90deg); color: var(--blue); }
+.pill-enf { color: var(--gray); font-size: 11px; padding: 1px 8px; flex: none; }
+.brule-detail {
+  margin: 8px 0 10px 26px; padding: 10px 14px 4px;
+  border-left: 2px solid var(--border); background: var(--panel-2); border-radius: 0 8px 8px 0;
+}
+.brule-detail .prose { font-size: 13px; margin-bottom: 8px; }
+.brule-detail .code { font-size: 12px; }
+.detail-heading {
+  margin: 10px 0 6px; font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: 0.7px; color: var(--muted);
+}
 .brule-id { min-width: 300px; font-size: 13px; }
 .brule-title { flex: 1; font-size: 13.5px; }
 .brule-odv { display: flex; align-items: center; gap: 10px; margin: 4px 0 2px 26px; }

@@ -98,6 +98,15 @@
 
   const checkbox = (row) => row.querySelector(".brule-check");
 
+  // Concept search: index each rule's detail text (NIST discussion, commands)
+  // once, so searching "screensaver" finds rules by meaning, not just by id.
+  const searchText = new Map(
+    rules.map((row) => {
+      const detail = row.querySelector(".brule-detail");
+      return [row, row.dataset.text + " " + (detail ? detail.textContent.toLowerCase() : "")];
+    })
+  );
+
   function apply() {
     const q = (search.value || "").trim().toLowerCase();
     const tag = tagSelect.value;
@@ -106,7 +115,7 @@
       const show =
         (!severity || row.dataset.severity === severity) &&
         (!tag || row.dataset.tags.split(" ").includes(tag)) &&
-        (!q || row.dataset.text.includes(q)) &&
+        (!q || searchText.get(row).includes(q)) &&
         (!selectedOnly.checked || checkbox(row).checked);
       row.hidden = !show;
       if (show) visible++;
@@ -134,6 +143,18 @@
     apply();
   });
   rules.forEach((row) => checkbox(row).addEventListener("change", apply));
+
+  rules.forEach((row) => {
+    const toggle = row.querySelector(".brule-toggle");
+    const detail = row.querySelector(".brule-detail");
+    if (toggle && detail) {
+      toggle.addEventListener("click", () => {
+        detail.hidden = !detail.hidden;
+        toggle.classList.toggle("open", !detail.hidden);
+        toggle.setAttribute("aria-expanded", String(!detail.hidden));
+      });
+    }
+  });
 
   for (const section of document.querySelectorAll(".builder-section")) {
     const set = (value) => (e) => {
